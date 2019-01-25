@@ -42,6 +42,7 @@ $$y_i=\alpha+\beta x_i+\epsilon_i,\ \ \  \epsilon_i ??? N(0,\epsilon^2)$$,
 The random components, $\epsilon_i$, are normally distributed with mean zero and constant variance $??^2$, such that we are essentially adding random white noise to the deterministic part of the model $(\alpha+\beta x_i)$. Thus, the full probability model for $y_i$ given $x_i$ $(y_i|x_i)$ can be written as
 
 $$y_i|x_i ??? N(\alpha+\beta x_i,\sigma^2)$$
+
 Hence, the mean comes from the deterministic part of the model, while the variance comes from the random part. We shall now look into fitting a simple linear regression model to some data.
 
 ## 3. Simple Linear Regression with one Numerical Exlanatory Variable
@@ -70,7 +71,7 @@ Before you ever do any statistical modelling of data, you should always perform 
 Let's examine the data evals. We can look at the raw values from evals using the RStudio pop-up spreadsheet viewer using:
 
 ```{r}
-View(evals)
+#View(evals)
 ```
 
 ```{r}
@@ -145,6 +146,7 @@ The correlation coefficient can be computed in R using the <code>get_correlation
 evals.scores %>%
   get_correlation(formula = score ~ bty_avg)
 ```
+
 Here, we are given a correlation coefficient of 0.187 for the relationship between teaching (<code>score</code>) and beauty (<code>bty_avg</code>) scores. This suggests a rather *weakly positive* linear relationship between the two variables. There is some subjective interpretation surrounding correlation coefficients not very close to -1, 0, 1.
 
 **Note**: the <code>cor</code> function can also be used to compute the correlation coefficient. For more details type <code>?cor</code> into the R console.
@@ -160,6 +162,7 @@ ggplot(evals.scores, aes(x = bty_avg, y= score)) +
        y = "Teaching Score", 
        title = "Relationship f Teaching and Beauty Scores")
 ```
+
 What can we observe from the scatterplot? Well, here it can be hard to see the weakly positive linear relationship suggested by the correlation coefficient (0.187), which is why our correlation coefficient is considered very weak in the verbal interpretation.
 
 Additionally, as our numerical variables are averages of integers (or whole numbers), a lot of the values will be plotted on top of one another. Remember, from Week 1, that this is referred to as **over-plotting**, and can be alleviated by slightly nudging (**jittering**) the points in a random direction. For example, let's look at the three points in the top-right of the scatterplot that have a beauty score slightly less than 8. Are there really only three values plotted there, or are there more that we cannot see due to over-plotting? Let's find out by adding some jitter to the plot:
@@ -171,6 +174,7 @@ ggplot(evals.scores, aes(x = bty_avg, y= score)) +
        y = "Teaching Score", 
        title = "Relationship f Teaching and Beauty Scores")
 ```
+
 1. There are actually more than just three points plotted in the top-right; and
 2. There are more instructors with a beauty score between 3 and 4.5 than originally appears due to over-plotting.
 
@@ -184,6 +188,7 @@ model <- lm(score ~ bty_avg, data = evals.scores)
 
 This tells us that our best-fitting line to the data is:
 $$score^=\alpha^+\beta^x_i=3.88034+0.06664???bty\_avg$$
+
 where
 
 +$\alpha^=3.88034$ is the intercept coefficient and means that, for any instructor with a  <code>bty_avg = 0</code>, their average teaching <code>score</code> would be 3.8803. Note that  <code>bty_avg = 0</code> is not actually possible as <code>bty_avg</code> is an average of beauty scores ranging between 1 and 10.
@@ -207,12 +212,245 @@ evals.scores %>%
   slice(21)
 ```
 
+What would the <code>score</code> be on our best-fitting line for this instructor with a <code>bty_avg</code> of 7.33? We simply plug the instructor's <code>bty_avg</code> into our regression model:
+
+$$score^=3.88034+0.06664???bty\_avg=3.88034+0.06664???7.33=4.369$$
+
+The regression model gives our instructor a <code>score</code> of 4.369. However, we know the  <code>score</code> of the instructor is 4.9 meaning that our model was out by 0.531. This is known as the **residual (\epsilon)** and can be thought of as the error or lack of fit of the regression line. In this case, the residual is given by:
+
+$$\epsilon^=y???y^=4.9???4.369=0.531$$
+
 **Task**: Obtain the observed <code>score</code> and <code>bty_avg</code> for the 13th instructor.
 
 ```{r}
 evals.scores %>%
   slice(13)
 ```
+
+**Quiz**: Using the regression model, find the fitted value of <code>score</code> for the 13th instructor?
+```{r}
+evals.scores %>%
+  slice(13) %>%
+  summarize(3.88034+0.06664*bty_avg)
+
+```
+
+**Quiz**: Using the regression model, find the value of the <code>residual error</code> for the 56th instructor?
+```{r}
+evals.scores %>%
+  slice(56) %>%
+  summarize(score - (3.88034+0.06664*bty_avg))
+
+```
+
+To obtain the fitted values and residuals for all instructors within the data set we can use the <code>get_regression_points</code> function:
+```{r}
+regression.points <- get_regression_points(model)
+regression.points
+```
+
+The table provides us with information on the:
+
++ <code>score</code>: the observed value of the outcome variable **y**;
++ <code>bty_avg</code>: the values of the explanatory variable **x**;
++ <code>score_hat</code>: the values of the fitted values **y^**; and
++ <code>residual</code>: the residuals **y???y^**.
+
+**Quiz**: Using the table above, find the fitted value of <code>score</code> for the 72nd instructor?
+```{r}
+regression.points %>%
+  slice(72) 
+  
+```
+
+**Quiz**: Using the table above, find the value of the <code>residual</code> error for the 44th instructor?
+```{r}
+regression.points %>%
+  slice(44) 
+  
+```
+
+### Assessing Model Fit
+When we fit a simple linear regression model there are five main assumptions that we need to hold true in order for the model to be an appropriate fit to the data. These assumptions are:
+
+1. The deterministic part of the model captures all the non-random structure in the data, i.e. the residuals have mean zero.
+2. The scale of the variability of the residuals is constant at all values of the explanatory variables.
+3. The residuals are normally distributed.
+4. The residuals are independent.
+5. The values of the explanatory variables are recorded without error.
+One way we can check our first assumption is to plot the residuals (<code>residuals</code>) against the explanatory variable (<code>bty_avg</code>). From this we should be able to check that the explanatory variable has a linear relationship with the outcome variable (<code>score</code>). We can plot the residuals against our explanatory variable using:
+
+```{r}
+ggplot(regression.points, aes(x = bty_avg, y = residual)) +
+  geom_point() +
+  labs(x = "Beauty Score", y = "Residual") +
+  geom_hline(yintercept = 0, col = "blue", size = 1)
+```
+
+Ideally, for the first assumption to hold we should observe the following:
+
++ There should be no systematic pattern, i.e. the residuals should appear randomly scattered.
++ The residuals should have mean zero. That is, they should be evenly scattered above and below the zero line. This is because the regression model will overestimate some of the fitted values, but it will also underestimate some, and hence, on average, they should even out to have mean zero.
+We can examine our first two assumptions by also plotting the residuals against the fitted values as follows:
+```{r}
+ggplot(regression.points, aes(x = score_hat, y = residual)) +
+  geom_point() +
+  labs(x = "Fitted values", y = "Residual") +
+  geom_hline(yintercept = 0, col = "blue", size = 1)
+```
+
+From the plot of the residuals against the fitted values we want to examine whether:
+
++ The residuals have mean zero.
++ If the residuals have constant variance across all levels of the fitted values. That is, the range (or spread) of the residuals should be similar across all levels of the fitted values and display no obvious changes in variability.
+
+To assess our third assumption that the residuals are normally distributed we can simply plot a histogram of the residuals:
+```{r}
+ggplot(regression.points, aes(x = residual)) +
+  geom_histogram(binwidth = 0.25, color = "white") +
+  labs(x = "Residual")
+```
+
+Ideally, for the assumption of normally distributed residuals, the histogram should be bell-shaped and centred at zero, i.e. the residuals have mean zero. However, in practice this will almost never be the case, and as such, like the plots of the residuals, there is some subjectivity in whether you believe the assumptions hold. For instance, here we can see that the histogram is slightly skewed to the left in that the distribution has a longer tail to the left. However, in my opinion, this is not of much concern as the histogram appears to be relatively symmetrical and bell-shaped, and as such the assumption of normally distributed random errors appears valid in this case.
+
+Finally, assumptions 4. and 5. are often justified on the basis of the experimental context and are not formally examined.
+
+
+## 3. Simple Linear Regression with one Categorical Explanatory Variable
+Here, we will fit a simple linear regression model were the explanatory variable is categorical. A **categorical variable** is a variable of a fixed number of possible values, assigning units to particular groups (or categories) based on qualitative properties. In R, a **categorical variable** is called a <code>factor</code>.
+
+We shall examine the <code>gapminder</code> data set from the <code>gapminder</code> library. This is a data set on life expectancy across various countries around the world. We will explore life expectancy and its potential differences:
+
++ Between continents: Does life expectancy vary, on average, between the five continents of the world?; and
++ Within continents: Does life expectancy vary, on average, within the five continents of the world?
+Thus, we will be looking at:
+
++ life expectancy as our numerical outcome variable **y**; and
++ the continent a country is within as our categorical variable **x**.
+
+### Exploratior Data Analysis
+Let's examine a subset of the <code>gapminder</code> data set relating to the year 2007. That is, we use the <code>filter</code> function to choose only the observations pertaining to 2007, and then <code>select</code> the variables we are interested in:
+
+```{r}
+gapminder2007 <- gapminder %>%
+  filter(year == 2007) %>%
+  select(country, continent, lifeExp)
+```
+
+The new data set can be examined using either the <code>View</code> or <code>glimpse</code> functions, i.e.
+
+```{r}
+glimpse(gapminder2007)
+```
+
+Here, we can see that both <code>country</code> and <code>continent</code> are factors (<code>fct</code>), which is how R stores categorical variables. Similarly to our previous exploratory data analysis, we can obtain summary statistics using the <code>skim</code> function. First, let's take a look at the life expectancy (<code>lifeExp</code>) and <code>continent</code> variables:
+
+```{r}
+gapminder2007 %>%
+  select(continent, lifeExp) %>%
+  skim() %>%
+```
+
+The summary output for the numerical outcome variable <code>lifeExp</code> is the same as we have seen previously. However, for the categorical variable <code>continent</code> we obtain:
+
++ <code>n_unique</code>: the number of levels/categories of the variable, i.e. the number of continents.
++ <code>top_counts</code>: the number of counts of each level/categories.
++ <code>ordered</code>: whether the variable is ordinal or not. That is, whether or not the ordering of the categories matter. "0" means that it is **not** ordered, "1" means that it is ordered.
+
+We can summarize any differences in life expectancy by continent by taking a look at the median and mean life expectancies of each continent using the <code>group_by</code> and  <code>summarize</code> functions as follows:
+
+```{r}
+lifeExp.continent <- gapminder2007 %>%
+  group_by(continent) %>% 
+  summarize(median = median(lifeExp), mean = mean(lifeExp))
+lifeExp.continent
+```
+
+Boxplots are often used when examining the distribution of a numerical outcome variable across different levels of a categorical variable:
+
+```{r}
+ggplot(gapminder2007, aes(x = continent, y= lifeExp)) +
+  geom_boxplot() +
+  labs(x = "Continent", y = "Life expectancy (years)", 
+       title = "Life expectancy by continent")
+```
+
+Here, we can see that the middle 50% of the life expectancy distribution of Africa is much smaller than, and does not overlap with, the middle 50% of the remaining four continents, while the country with the highest life expectancy in Africa is less than all countries in Oceania. Speaking of Oceania, there is almost no variability (or spread) in life expectancy in this continent, however that may well be because it consists of only two countries (Australia and New Zealand). There is more variability in life expectancy in the continents of Africa and Asia.
+
+```{r}
+lifeExp.Asia.min <- gapminder2007 %>%
+  filter(continent == "Asia") %>% 
+  group_by(country) %>%
+  summarize(median = median(lifeExp), mean = mean(lifeExp))
+lifeExp.Asia.min
+```
+
+### Formal Analysis
+When examining the relationship between a numerical outcome variable **y** and a categorical explanatory variable **x**, we are not just looking to find the best-fitting line to the data as before, but are examining relative differences to a baseline category. For example, the table below displays the mean life expectancy of each continent, as well as the differences between the means of each continent and Africa. Now, in comparison with Africa we can see that the mean life expectancy of the other continents is around 18-26 years greater than that of Africa.
+
+```{r}
+mean.africa <- lifeExp.continent %>%
+  filter(continent == "Africa") %>%
+  pull(mean)
+
+gapminder2007 %>%
+  group_by(continent) %>%
+  summarize(mean = mean(lifeExp)) %>%
+  mutate('mean vs Africa' = mean - mean.africa)
+```
+
+**NOTE**: the use of the <code>pull()</code> <code>dplyr</code> function above which works like <code>[[</code> for local data frames, i.e. it extracts a variable from a data frame.
+
+Now let us fit our regression model to the data, where <code>lifeExp</code> is our outcome variable $y$ and <code>continent</code> is our categorical explanatory variable $x$:
+
+```{r}
+lifeExp.model <- lm(lifeExp ~ continent, data = gapminder2007)#
+summary(lifeExp.model)
+```
+
+**Note**: For now we will ignore the last five columns of the regression table and only focus on the estimate column.
+
+We obtain five estimates: the <code>intercept</code> term and four others relating to the continents (<code>continentAmericas</code>, <code>continentAsia</code>, <code>continentEurope</code> and  <code>continentOceania</code>), such that our regression equation is given as:
+
+$$life exp^=\alpha^+\beta^Amer???^IAmer(x)+\beta^Asia???^IAsia(x)+\beta^Euro???^IEuro(x)+\beta^Ocean???^IOcean(x)$$
+
+where
++ the intercept $\alpha^$ is the mean life expectancy for our baseline category Africa;
++ $\beta^continent$ is the difference in the mean life expectancy of a given continent relative to the baseline category Africa; and
++ $^Icontinent(x)$ is an indicator function such that
+
+$$
+^Icontinent(x) = \left\{
+                  \begin{array}{ll}
+                  1 & if\ country\ x\ is\ in\ the\ continent \\
+                  0 & Otherwise
+                  \end{array}
+              \right.
+$$
+
+Essentially, the estimates for each continent are known as offsets relative to the baseline category (Africa in this case). For example, the mean life expectancy for Africa is simply equal to the intercept term $\alpha^=54.8$. However, the mean life expectancy for Asia is $\alpha^+\beta^Asia???I^Asia(x)=54.8+15.9???1=70.7$.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
