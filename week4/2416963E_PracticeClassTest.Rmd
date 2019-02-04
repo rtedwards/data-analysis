@@ -1,0 +1,90 @@
+---
+title: "Practice Class Test Template"
+author: "2416963E"
+output:
+  pdf_document:
+          latex_engine: pdflatex
+          number_sections: yes
+fig_caption: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, eval = TRUE, warning = FALSE, message = FALSE, comment = NA)
+```
+
+```{r libraries}
+library(ggplot2)
+library(dplyr)
+library(moderndive)
+library(skimr)
+library(kableExtra)
+library(gridExtra)
+library(MASS)
+```
+
+```{r data, echo = FALSE, eval = TRUE, warning = FALSE, message = FALSE}
+cats <- read.csv("cats.csv")
+```
+
+# Introduction {#sec:Intro}
+Digialis is a heart mdicine similar to toxins found in a genus of plants commonly known as foxglove.  These plans can be poisonous towards humans and pet.  As part of digitalis experiments, 144 domstics male and female dult cats had their heart weight in grams (Hwt) and bod weight in kilograms (Bwt) measured.
+
+# Exploratory Data Analysis {#sec:EDA}
+Let's take of a lok at our data.
+
+```{r, echo=FALSE}
+cats %>%
+  group_by(Sex) %>%
+  summarise(n=n(), Mean=round(mean(Hwt), digits=1), St.Dev=round(sd(Hwt), digits=1), Min=min(Hwt), Q1=quantile(Hwt, 0.25), Median=median(Hwt), Q3=quantile(Hwt, 0.75), Max=max(Hwt)) %>%
+  kable(caption = "\\label{tab:summaries} Summary statistics on heart weight by sex of 144 adult cats.") %>%
+  kable_styling(latex_options = "hold_position")
+```
+
+So we have our data in a tidy format with <code>Bwt</code> and <code>Hwt</code> as continuous variables and <code>Sex</code> as a catgorical 
+
+```{r, echo=FALSE, eval=FALSE}
+cats %>%
+  group_by(Sex) %>%
+  skim(Hwt) %>%
+  kable(caption = '\\label{tab:summaries} Summary statistics on heart weight by sex of 144 adult cats.') %>%
+  kable_styling(latex_options = "hold_position")
+```
+
+Let's take a look at the spread of <code>Hwt</code> in each sex.
+
+```{r boxplot, echo = TRUE, eval = TRUE, out.width = '70%', fig.pos="H", fig.align = "center", warning = FALSE, fig.cap = "\\label{fig:box}Heart weights by sex."}
+ggplot(cats, aes(x = Sex, y = Hwt)) + 
+  geom_boxplot() +
+  labs(x = "Sex", y = "Heart weight (grams)", 
+       title = "Heart weights in 144 adult cats")
+```
+
+The male cat population has a larger spread than the female popultion.  The male cat population is slightly left skewed.  Each population has one outlier.  
+
+# Formal Data Analysis {#sec:FDA}
+We now fit  linear regression model to the data with <code>Bwt</code> as the explanatory variable and <code>Hwt</code> as the predicted variable with <code>Sex</code> as a categorical variable with *Male*=1 and *Female*=0 .
+
+$$\widehat{\mbox{Hwt}} = \widehat{\alpha} + \widehat{\beta}_{\mbox{Male}} \cdot \mathbb{I}_{\mbox{Male}}(x) $$
+
+where,
++ the intercept $\widehat{\alpha}$ is the mean heart weight for he baseline category of Females;
++ $\widehat{\beta}_{\mbox{Male}}$ is he diference in the mean heart weight of a Males relative to the bseline category Females; 
++ $\mathbb{I}_{\mbox{Male}}(x)$ is an indicator function such that
+
+$$\mathbb{I}_{\mbox{Male}}(x)=\left\{
+    \begin{array}{11}
+    1 ~~~ \mbox{if Sex of} ~ x \mbox{th observation is Male},\\
+    0 ~~~ \mbox{Otherwise}.\\
+    \end{array}
+  \right.$$
+
+# Conclusions {#sec:Conc}
+
+
+
+
+
+
+
+
+
