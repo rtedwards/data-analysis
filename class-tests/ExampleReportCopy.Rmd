@@ -83,7 +83,7 @@ model <- lm(score ~ bty_avg, data = evals.scores)
 Coefs <- round(coef(model), 3)
 ```
 
-Tabl \ref{tab} displays the estimated intercept and slope parameters of th best-fittin lin rm the regression model.  Hence, the best-fitting line is given as:
+Table \ref{tab:reg} displays the estimated intercept and slope parameters of th best-fittin lin rm the regression model.  Hence, the best-fitting line is given as:
 
 $$\widehat{\mbox{teaching score}} = `r Coefs[1]` + `r Coefs[2]` \cdot \mbox{beauty score}.$$
 
