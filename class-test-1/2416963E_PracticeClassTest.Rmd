@@ -1,0 +1,126 @@
+---
+title: "Practice Class Test Template"
+author: "2416963E"
+output:
+  pdf_document:
+          latex_engine: pdflatex
+          number_sections: yes
+fig_caption: yes
+---
+
+```{r setup, echo = FALSE, eval = TRUE, warning = FALSE, message = FALSE}
+knitr::opts_chunk$set(echo = FALSE, eval = TRUE, warning = FALSE, message = FALSE, comment = NA)
+```
+
+```{r libraries}
+library(ggplot2)
+library(dplyr)
+library(moderndive)
+library(skimr)
+library(kableExtra)
+library(gridExtra)
+library(MASS)
+```
+
+```{r data, echo = FALSE, eval = TRUE, warning = FALSE, message = FALSE}
+cats <- read.csv("cats.csv")
+```
+
+# Introduction {#sec:Intro}
+**Question of Interest: Using a linear model, describe the heart weights of male and femal adult cats.  What does the model say about the difference, on average, between male and female cats?**
+
+Experiments were conducted as part of research into "Digitalis", a heart medicine similar to toxins found in plants commonly known as foxglove. 144 domestic male and female adult cats were used in the experiments and they each had their heart weight in grams (<code>Hwt</code>) measured.  This data, including the gender (<code>Sex</code>) of each cat, is analyzed in this report.
+
+In particular, this report presents numerical and graphical summaries of the heart weights of the cats and fits a linear model to estimate the difference, on average, between the heart weights of male and female cats. 
+
+# Exploratory Data Analysis {#sec:EDA}
+Summary statistics of the heart weights of the cats are presented in the following table for each sex separately.  
+
+```{r summaries, echo = FALSE, eval = TRUE, warning = FALSE, message = FALSE}
+cats %>%
+  group_by(Sex) %>%
+  summarise(n=n(), Mean=round(mean(Hwt), digits=1), St.Dev=round(sd(Hwt), digits=1), Min=min(Hwt), Q1=quantile(Hwt, 0.25), Median=median(Hwt), Q3=quantile(Hwt, 0.75), Max=max(Hwt)) %>%
+  kable(caption = "\\label{tab:summaries} Summary statistics on heart weight by sex of 144 adult cats.") %>%
+  kable_styling(latex_options = "hold_position")
+```
+
+```{r, echo = FALSE, eval = TRUE, warning = FALSE, message = FALSE}
+skim_with(numeric = list(hist = NULL, missing = NULL, complete = NULL, n = NULL))
+cats %>%
+  group_by(Sex) %>%
+  skim_to_list() %>%
+  .$numeric %>%
+  #skim(Hwt) %>%
+  kable(caption = '\\label{tab:summaries} Summary statistics on heart weight by sex of 144 adult cats.') %>%
+  kable_styling(latex_options = "hold_position")
+```
+This table shows that there were approximately twice as many male cats in the sample (97 compared to 47) and that the summariesof the heart weights of the male cats were consistently greater than the corresponding summaries of the heart weights of female cats.  These differences can be easily seen in the following boxplots which summarise the distributions of the heart weights of male and female cats.
+
+```{r boxplot, echo = FALSE, eval = TRUE, out.width = '70%', fig.pos="H", fig.align = "center", warning = FALSE, fig.cap = "\\label{fig:box}Heart weights by sex."}
+ggplot(cats, aes(x = Sex, y = Hwt)) + 
+  geom_boxplot() +
+  labs(x = "Sex", y = "Heart weight (grams)", 
+       title = "Heart weights in 144 adult cats")
+```
+The boxplot shows that in addition to male cats having heavier hearts on average compared to the female cats' hearts, the weights of the male hearts were also more widely distributed.  This is also reflected in the standard deviation of the male heart weights being nearly twice the standard deviation of the female cats' heart weights (2.5 grams compared to 1.4 grams, respectively).  There are also potentially two outliers (one male and one female) as shown by the two points beyond the "whiskers" of the boxplots.
+
+# Formal Data Analysis {#sec:FDA}
+To begin to analyse the cat heart weights data formally, we fit the following linear model to the data.
+
+$$\widehat{\mbox{Hwt}} = \widehat{\alpha} + \widehat{\beta}_{\mbox{Male}} \cdot \mathbb{I}_{\mbox{Male}}(x) $$
+
+where,
+
++ the intercept $\widehat{\alpha}$ is the mean heart weight for the baseline category of Females;
++ $\widehat{\beta}_{\mbox{Male}}$ is the difference in the mean heart weight of a Males relative to the bseline category Females; 
++ $\mathbb{I}_{\mbox{Male}}(x)$ is an indicator function such that
+
+$$\mathbb{I}_{\mbox{Male}}(x)=\left\{
+            \begin{array}{ll}
+              1 ~~~ \mbox{if Sex of} ~ x \mbox{th observation is Male},\\
+              0 ~~~ \mbox{Otherwise}.\\
+            \end{array}
+          \right.$$
+
+When this model is fitted to the data, the following estimates of $\alpha$ (**intercept**) and $\beta_{Male}$(**SexM**) are returned:
+
+```{r reg, echo = FALSE, eval = TRUE, warning = FALSE, message = FALSE}
+model <- lm(Hwt ~ Sex, data = cats)
+  get_regression_table(model) %>%
+    dplyr::select(term, estimate) %>% #necessary to include dplyr here
+    kable(caption = "\\label{tab:reg} Estimates of the parameters from the fitted linear regression model.") %>%
+    kable_styling(latex_options = "HOLD_position")
+```
+
+Hence the model estimates the average heart weight of female cats is `r model$Coefficients[1]` grams (which agrees with the sample mean reported in Table \ref{tab:summaries}) and that the male cats' heart weight are, on average, `r model$Coefficients[2]` grams heavier than the female cats' heart weights.
+
+Before we can proceed to use the fitted model (forexample to perform statistical inference) we must check the assumptions of the model.  These are best considered in light of the residual plots in Figure \ref{fig:residplots}.
+
+```{r residplots, echo=FALSE, eval=TRUE, warning=FALSE, message=FALSE, fig.width=13, fig.align="center", fig.cap="\\label{fig.resids} Scatterplot of the residuals by Sex (left) and a histogram of the residuals (right).", fig.pos = "H"}
+regression.points <- get_regression_points(model)
+p1 <- ggplot(regression.points, aes(x = Sex, y = residual)) +
+  geom_jitter(width = 0.1) +
+  labs(x = "Sex", y = "Residual") +
+  geom_hline(yintercept = 0, col = "blue")
+
+p2 <- ggplot(regression.points, aes(x = residual)) + 
+  geom_histogram(color = "white") +
+  labs(x = "Residual")
+
+grid.arrange(p1, p2, ncol = 2)
+```
+
+The scatterplots show an approximately even spread of the residuals above and below the zero line for each gender, and hence the ssumption that the residuals have mean zero appears valid.  The assumption of constant variance within the two geners is not supported, however, as the spread of the residuals in the vertical scatter of the male cats is considerably more than that of the females (as was noted above when the standard deviations were considered).  The histogram supports the assumption of normally distributed errors in the model, with the exception of a potential outlier.
+
+# Conclusions {#sec:con}
+In summary, we have estimated that, on average, the male cats have hearts which weigh `r model$Coefficients[2]` grams more than the female cats' hearts.  In particular, we estimate the average heart weight of female cats is `r model$Coefficients[1]` grams and the average heart weight of male cats is 11.3 grams.
+
+In addition to the centers of the distributions of male and female cats' heart weights being different, we have also observed that the spread of the male heart weights is greater than the spread of the female cats' heart weights.  This may pose a problem if the standard linear model was used to further analyse this data, and therefore it is reccomended that models which allow for differences in the variances within different groups be used.
+
+
+
+
+
+
+
+

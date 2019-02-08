@@ -1,0 +1,118 @@
+---
+title: "PGA and LPGA Tour 2008 Driving Accuracy"
+author: "2416963E"
+output:
+  pdf_document:
+          latex_engine: pdflatex
+          number_sections: yes
+fig_caption: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, eval = TRUE, warning = FALSE, message = FALSE, comment = NA)
+```
+
+```{r libraries}
+library(ggplot2)
+library(dplyr)
+library(moderndive)
+library(skimr)
+library(kableExtra)
+library(gridExtra)
+library(MASS)
+```
+
+```{r data, echo = FALSE, eval = TRUE, warning = FALSE, message = FALSE}
+PGA <- read.csv("PGALPGA2008.csv")
+```
+
+# Introduction {#sec:Intro}
+The opening stroke (or "drive") in golf is an important metric in determining how well a golfer performs.  For a golfer to be competative it is important for the drive to accurately land on the fairway, minimizing the number strokes on the hole.  Data on 354 golfers (male and female) from the 2008 PGA and LPGA tours are analysed through their drive accuracy (<code>Accuracy</code>) in percent and Gender (<code>Gender</code>). 
+
+In particular, this report presents numerical and graphical summaries of the drive accuracies of the professional golfers and fits a linear model to estimate the difference, on average, between the drive accuracies of professional female and male golfers.
+
+# Exploratory Data Analysis {#sec:EDA}
+Summary statistics of the PGA and LPGA driving accuracies.  
+
+```{r summaries, echo = FALSE, eval = TRUE, warning = FALSE, message = FALSE}
+PGA %>%
+  group_by(Gender) %>%
+  summarise(n=n(), Mean=round(mean(Accuracy), digits=1), St.Dev=round(sd(Accuracy), digits=1), Min=min(Accuracy), Q1=quantile(Accuracy, 0.25), Median=median(Accuracy), Q3=quantile(Accuracy, 0.75), Max=max(Accuracy)) %>%
+  kable(caption = "\\label{tab:summaries} Summary statistics on driving accuracy by Gender of 354 professional golfers.") %>%
+  kable_styling(latex_options = "hold_position")
+``` 
+
+Table \ref{tab:summaries} shows that there are slightly more Men in the sample (197 compared to 157) and that the summaries of the of the male golfers were consistently similar ot that of the female golfers.  These similarities can be seen in the following boxplots which summarise the distributions of the drive accuracies of the male and female professional golfers in the 2008 PGA and LPGA tours.
+
+The boxplot in Figure \ref{fig:box} shows that female golfers have a higher drive accuracies on average compared to male drive accuracies.  The drive accuracies of both genders are about evenly distributed, which is also reflected in the standard deviation of female and male drive accuracies (5.8% compared to 5.5% respectively). There are also a number of potential outliers (5 female and 1 male) as shown by the points beyond the "whiskers" of the boxplots. 
+
+```{r boxplot, echo = FALSE, eval = TRUE, out.width = '70%', fig.pos="H", fig.align = "center", warning = FALSE, fig.cap = "\\label{fig:box}Driving accuracy by gender."}
+ggplot(PGA, aes(x = Gender, y = Accuracy)) + 
+  geom_boxplot() +
+  labs(x = "Gender", y = "Accuracy", 
+       title = "Driving accuracies in 354 professional golfers.")
+```
+
+# Formal Data Analysis {#sec:FDA}
+To analyse the PGA and LPGA drive accuracy data formally, a linear model is fit to the data.
+
+$$\widehat{\mbox{Accuracy}} = \widehat{\alpha} + \widehat{\beta}_{\mbox{Female}} \cdot \mathbb{I}_{\mbox{Female}}(x) $$
+
+where,
+
++ the intercept $\widehat{\alpha}$ is the mean drive accuracy for the baseline category of Males;
++ $\widehat{\beta}_{\mbox{Female}}$ is the difference in the mean heart weight of a Females relative to the baseline category Males; 
++ $\mathbb{I}_{\mbox{Female}}(x)$ is an indicator function such that
+
+$$\mathbb{I}_{\mbox{Female}}(x)=\left\{
+            \begin{array}{ll}
+              1 ~~~ \mbox{if Sex of} ~ x \mbox{th observation is Female},\\
+              0 ~~~ \mbox{Otherwise}.\\
+            \end{array}
+          \right.$$
+
+When this model is fitted to the data, the following estimates of $\alpha$ (**intercept**) and $\beta_{Female}$(**GenderFemale**) are returned:
+
+```{r reg, echo = FALSE, eval = TRUE, warning = FALSE, message = FALSE}
+PGA <- within(PGA, Gender <- relevel(Gender, ref = "Male"))
+model <- lm(Accuracy ~ Gender, data = PGA)
+  get_regression_table(model) %>%
+    dplyr::select(term, estimate) %>% #necessary to include dplyr here
+    kable(caption = "\\label{tab:reg} Estimates of the parameters from the fitted linear regression model.") %>%
+    kable_styling(latex_options = "hold_position")
+```
+
+Hence the model estimates the average drive accuracy of male golfers is `r model$Coefficients[1]` grams (which agrees with the sample mean reported in Table \ref{tab:summaries}) and that the female golfer drive accuracy are, on average, `r model$Coefficients[2]` percent higher than the male golfers' drive accuracy.
+
+Before we can proceed to use the fitted model (for example to perform statistical inference) we must check the assumptions of the model.  These are best considered in light of the residual plots in Figure \ref{fig:residplots}.
+
+```{r residplots, echo=FALSE, eval=TRUE, warning=FALSE, message=FALSE, fig.width=13, fig.align="center", fig.cap="\\label{fig.resids} Scatterplot of the residuals by Gender (left) and a histogram of the residuals (right).", fig.pos = "H"}
+regression.points <- get_regression_points(model)
+p1 <- ggplot(regression.points, aes(x = Gender, y = residual)) +
+  geom_jitter(width = 0.1) +
+  labs(x = "Gender", y = "Residual") +
+  geom_hline(yintercept = 0, col = "blue")
+
+p2 <- ggplot(regression.points, aes(x = residual)) + 
+  geom_histogram(color = "white") +
+  labs(x = "Residual")
+
+grid.arrange(p1, p2, ncol = 2)
+```
+
+The scatterplots show an approximately even spread of the residuals above and below the zero line for each gender, and hence the assumption that the residuals have mean zero appears valid.  The assumption of constant variance within the two genders is supported, as the spread of the residuals in the vertical scatter of the male golfers is similar to that of the female golfers (as was noted above when the standard deviations were considered).  The histogram supports the assumption of normally distributed errors about meanzero in the model.  
+
+```{r CI, echo = FALSE, eval = TRUE, warning = FALSE, message = FALSE}
+CI <- t.test(PGA$Accuracy[PGA$Gender == "Male"], PGA$Accuracy[PGA$Gender == "Female"], conf.int=TRUE)
+
+```
+The assumptions of the Normal model appear to hold and we can now perform statistical inference in the form of a confidence interval.  A confidence interval (`r round(CI$conf.int[1],2)`, `r round(CI$conf.int[2], 2)`) indicates that the true difference in means is not equal to zero and we conclude that there is a difference in drive accuracies between professional female and professional male golfers in the 2008 LPGA and PGA tours, respectively. 
+
+# Conclusions {#sec:Conc}
+In summary, we have estimated that, on average, professional female golfers in the 2008 LPGA Tour have drive accuracies `r round(model$coefficients[2],2)` percent more than professional male golfers in the 2008 PGA Tour. In particular, we estimate the average drive accuracy of professional male golfers is `r round(model$coefficients[1],2)` percent and the average drive accuracy of professional female golfers is `r round(model$coefficients[1],2) + round(model$coefficients[2],2)` percent with a confidence interval between the two means (`r round(CI$conf.int[1],2)`, `r round(CI$conf.int[2], 2)`) indicating there is a true difference in means.  
+
+
+
+
+
+

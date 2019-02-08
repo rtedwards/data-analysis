@@ -1,0 +1,38 @@
+---
+title: "Practice Class Test Template"
+author: "Include your Student Number here"
+output:
+  pdf_document:
+          latex_engine: pdflatex
+          number_sections: yes
+fig_caption: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, eval = TRUE, warning = FALSE, message = FALSE, comment = NA)
+```
+
+```{r libraries}
+library(ggplot2)
+library(dplyr)
+library(moderndive)
+library(skimr)
+library(kableExtra)
+library(gridExtra)
+library(MASS)
+```
+
+```{r data, echo = FALSE, eval = TRUE, warning = FALSE, message = FALSE}
+cats <- read.csv("cats.csv")
+```
+
+# Introduction {#sec:Intro}
+
+
+# Exploratory Data Analysis {#sec:EDA}
+
+
+# Formal Data Analysis {#sec:FDA}
+
+
+# Conclusions {#sec:Conc}
