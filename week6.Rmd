@@ -1,0 +1,42 @@
+---
+title: "Multiple Regression"
+author: "Robert Edwards"
+date: "15 February 2019"
+output:
+  pdf_document:
+          latex_engine: pdflatex
+          number_sections: yes
+fig_caption: yes
+---
+
+```{r setup, echo = FALSE, eval = TRUE, warning = FALSE, message = FALSE}
+knitr::opts_chunk$set(echo = FALSE, eval = TRUE, warning = FALSE, message = FALSE, comment = NA)
+```
+
+```{r libraries}
+library(ggplot2)
+library(dplyr)
+library(moderndive)
+library(skimr)
+library(kableExtra)
+library(gridExtra)
+library(plotly)
+library(tidyr)
+library(ISLR)
+```
+
+#Introduction {#sec:Intro}
+When fitting regression models with multiple explanatory variables, the interpretation of an explanatory variable is made in association with the other variables. For example, if we wanted to model income then we may consider an individual's level of education, and perhaps the wealth of their parents. Then, when interpreting the effect an individuals level of education has on their income, we would also be considering the effect of the wealth of their parents simultaneously, as these two variables are likely to be related.
+
+#Modelling with Two Continuous Covariates {sec:continuous}
+The regression model we will be considering contains the following variables:
+
++ the continuous outcome variable y, the credit card balance of an individual; and
++ two explanatory variables x1 and x2, which are an individual's credit limit and income (both in thousands of dollars), respectively.
+
+##Exploratory Data Analysis
+
+
+```{r data, echo = FALSE, eval = TRUE, warning = FALSE, message = FALSE}
+cats <- read.csv("cats.csv")
+```
