@@ -4,9 +4,12 @@ author: "Robert Edwards"
 date: "15 February 2019"
 output:
   pdf_document:
-          latex_engine: pdflatex
-          number_sections: yes
+    latex_engine: pdflatex
+    number_sections: yes
+  html_document:
+    df_print: paged
 fig_caption: yes
+always_allow_html: yes
 ---
 
 ```{r setup, echo = FALSE, eval = TRUE, warning = FALSE, message = FALSE}
@@ -80,10 +83,328 @@ as.data.frame(cor(credit)) %>%
   kable_styling(latex_options = 'HOLD_position')
 ```
 
+**What would be the verbal interpretation of the correlation coefficient for the linear relationship between Balance and  Income?**
+
++ Weakly Positive
+
+**Collinearity** (or **multicolinnearity**) occurs when an explanatory variable within a multiple regression model can be linearly predicted from the other explanatory variables with a high level of accuracy.  For example, in this case, since <code>Limit</code> and <code>Income</code> are highly correlated, we could take a good guess as to an individual's <code>Income</code> based on their <code>Limit</code>.  That is, having one or momre higly correlated explantory variables within a multiple regression model essentially provides us with redundant information.  Normally, we would remove one of the highly correlated variables, but for the purpose of this example we will ignore the potenital issue.  
+
+```{r scatter1, echo = TRUE, eval = TRUE, out.width = '70%', fig.pos="H", fig.align = "center", warning = FALSE, fig.cap = "\\label{fig:scatter1}Relationship between balance and explanatory variables: credit limit and income."}
+p1 <- ggplot(credit, aes(x = Limit, y = Balance)) +
+         geom_point() +
+         labs(x = "Credit limit [$]", 
+              y = "Credit card balance [$]",
+              title = "Relationship between balance and credit limit") +
+         geom_smooth(method = "lm", se = FALSE)
+p2 <- ggplot(credit, aes(x = Income, y = Balance)) +
+         geom_point() +
+         labs(x = "Credit income [$]", 
+              y = "Credit card balance [$]",
+              title = "Relationship between income and income") +
+         geom_smooth(method = "lm", se = FALSE)
+
+grid.arrange(p1, p2, layout_matrix = matrix(seq_len(1*2), nrow = 1, ncol = 2))
+```
+
+**What is the relationship between balance and credit limit?**
+
++ Positive
+
+**What is the relationship between balance and income?**
+
++ Positive
+
+The two scatterplots in Figure \ref{fig:scatter1} focus on the relationship between the outcome variable <code>Balance</code> and each of the explanatory variables independently.  In order to get an idea of the relationship between all three variables we can use the <code>plot_ly</code> function within the <code>plotly</code> library to plot a 3D scatterplot as follows.
+
+```{r scatter2, echo = FALSE, eval = TRUE, out.width = '70%', fig.pos="H", fig.align = "center", warning = FALSE, fig.cap = "\\label{fig:scatter2}3D scatterplot between balance and explanatory variables: credit limit and income."}
+plot_ly(credit, x = ~Income, y = ~Limit, z = ~Balance, type = "scatter3d", mode = "markers")
+```
+
+##Formal Analysis
+The multiple regression model we will be fitting to the credit balance data is given as:
+
+$$y_i = \alpha + \beta_1x_{1i} + \beta_2x_{2i} + \epsilon_i, ~~~ \epsilon \sim N(0, \sigma^2)$$
+
+where
+
++ $y_i$ is the credit balance of the $i^{ith}$ individual;
++ $\alpha$ is the intercept and positions the best-fitting plane in 3D space;
++ $\beta_1$ is the coefficient for the first explanatory variable $x_1$;
++ $\beta_2$ is the coefficient for the second explanatory variable $x_2$;
++ $\epsilon_i$ is the $i^{th}$ random error component
+
+```{r reg, echo = FALSE, eval = TRUE, warning = FALSE, message = FALSE}
+balance.model <- lm(Balance ~ Limit + Income, data = credit)
+  get_regression_table(balance.model) %>%
+#    dplyr::select(term, estimate) %>% #necessary to include dplyr here
+    kable(caption = "\\label{tab:reg} Estimates of the parameters from the fitted linear regression model.") %>%
+    kable_styling(latex_options = "HOLD_position")
+```
+
+**Simpson's Paradox:** From Figure \ref{fig:scatter1} we see positive relationships between credit card balance against both credit limit and income.  Why do then get a negative coefficient for income ($\widehat{\beta_{income}} = -7.66$)? This is due to a phenomenon known as **Simpson's Paradox**.  This occurs when there are trends within different catagories (or groups) of data, but that these trends disappear when the categories are grouped as a whole.  
+
+##Assessing Model Fit
+Now we need to asses our model assumptions:
+
+1. The deterministic part of the model captures all the non-random structure in the data (residuals have mean zero)
+2. The scale of the variability of the residuals is constant at all values of the explanatory variables.
+3.  The residuals are normally distributed.
+4.  The residuals are independent.
+5.  The values of the explanatory variables are recorded without error.
+
+First, we need to obtain the fitted values and residuals from our regression model:
+
+```{r reg_points, echo = TRUE, eval = TRUE, warning = FALSE, message = FALSE}
+regression.points <- get_regression_points(balance.model)
+```
+
+Recall that <code>get_regression_points</code> provides us with values of the:
+
++ outcome variable $y$ (<code>balance</code>)
++ explanatory variables $x_1$ (<code>Limit</code>) and $x_2$ (<code>Income</code>)
++ fitted values $\widehat{y}$
++ the residual error ($y - \widehat{y}$)
+
+We can asses our first two model assumptions by producing scatterplots of our residuals against each of our explanaotry variables.
+
+```{r scatter3, echo = FALSE, eval = TRUE, fig.width = 13, fig.align = "center", warning = FALSE, fig.cap = "\\label{fig:scatter3}Residual plots of credit limit and income."}
+p3 <- ggplot(regression.points, aes(x = Limit, y = residual)) +
+         geom_point() +
+         labs(x = "Credit limit [$]", 
+              y = "Residual",
+              title = "Residuals vs. credit limit") +
+         geom_hline(yintercept = 0, col = "blue", size = 1)
+p4 <- ggplot(regression.points, aes(x = Income, y = residual)) +
+         geom_point() +
+         labs(x = "Credit income [$]", 
+              y = "Residual",
+              title = "Residuals vs. Income") +
+         geom_hline(yintercept = 0, col = "blue", size = 1)
+
+grid.arrange(p3, p4,ncol = 2)
+```
+
+From Figure \ref{fig:scatter3} wesee that the residuals do not have mean zero and constant variability across all values of the explanatory variables.
+
+Finally, we can check if the residuals are normally distributed by producing a histogram:
+
+```{r hist1, echo = FALSE, eval = TRUE, out.width = '70%', fig.pos="H", fig.align = "center", warning = FALSE, fig.cap = "\\label{fig:scatter1}Histogram of residuals."}
+ggplot(regression.points, aes(x = residual)) +
+  geom_histogram(color = "white") +
+  labs(x = "Residual")
+```
+
+**Do the residuals appear to be normally distributed?**
+
++ No, the histogram is right-skewed, which suggests that we are underestimating a lot of credit card holder's balances by a relatively large amount.  That is, since the residuals are computed as $y - \widehat{y}$, a lot of the fitted values are much lower than the observed values.
+
+#Modelling With 1 Continuous & 1 Categorical Explanatory Variable
+We are revisiting the instructor evaluation data set <code>evals</code>.  We have examine dthe relationship between teaching score (<code>score</code>) and age (<code>age</code>) and we now introduce the additional (binary) categorical explanatory variable gender (<code>gender</code>):
+
++ the teaching score (<code>score</code>) as our outcome variable $y$
++ age (<code>age</code>) as our continuous explanatory variable $x_1$
++ gender (<code>gender</code>) as our categorical explanatory variable $x_2$
+
+##Exploratory Data Analysis
+First, we subset the <code>evals</code> dataset so we only have <code>score</code>, <code>age</code>, and <code>gender</code>.  
+
+```{r summary2, echo = FALSE, eval = TRUE, warning = FALSE, message = FALSE}
+eval.score <- evals %>%
+  select(score, age, gender) %>%
+  glimpse()
+
+eval.score %>%
+  skim()
+```
+
+**How many males are in the data set?**
+
++ There are `r length(which(eval.score == "male"))` males in the data set
+
+**What is the median age in the data set?**
+
++ The median age is `r median(eval.score$age)`
+
+**What is the maximum teaching score of the bottom 25% of the professors?**
+
++ Max teaching score is `r quantile(eval.score$score, 0.25)` of bottom 25% of professors
+
+**What is the correlation coefficient between <code>score</code> and <code>age</code>?**
+
++ Correlation(score, age) = `r cor(eval.score$score, eval.score$age)`, which suggests a very weak negative relationship.
+
+```{r scatter4, echo = FALSE, eval = TRUE, out.width = '70%', fig.pos="H", fig.align = "center", warning = FALSE, fig.cap = "\\label{fig:scatter4}Instructor evaluation scores by age and gender.  The points have been jittered."}
+ggplot(eval.score, aes(x = age, y = score, color = gender)) +
+  geom_jitter() +
+  labs(x = "Age", 
+      y = "Teaching Score",
+      color = "Gender") +
+  geom_smooth(method = "lm", se = FALSE)
+
+```
+
+From the scatterplot in Figure \ref{fig:scatter3} we can see that:
+
++ There are very few women over the age of 60 in our dataset
++ From the plotted regression lines we can see that the lines have different slopes for men and women.  That is, the associated effect of increasing age appears to be more severe for women than it does for men (i.e. the teaching score of women drops faster with age)
+
+##Multiple Regression: Parallel Slopes Model
+We begin by fitting a parallel regression lines model.  This model implies that the slope of the relationship between teaching score(<code>score</code>) and age (<code>age</code>) is the same for both males and females, with only the intercept of the regression lines changing.  Hence, our parallel regression lines model is given as:
+
+$$y_i = \beta_1x_{1i} + \beta_2x_{2i} + \epsilon_i$$
+$$y_i = \alpha + \beta_{age} \cdot age_i + \beta_{male} \cdot \mathbb{I}_{\mbox{male}}(i) + \epsilon_i$$
+
+where:
+
++ $\alpha$ is the intercept of the regression line for females;
++ $\beta_{age}$ is the slope of the regression line for both males and females;
++ $age_i$ is the age of the $i^th$ observation
++ $\beta_{male}$ is the additional term added to $\alpha$ to get the intercept of the regression line for males;
++ $\mathbb{I}_{\mbox{male}}(i)$ is an indicator function such that
+
+$$
+^Imale(i) = \left\{
+                  \begin{array}{ll}
+                  1 & if\ the\ ith\ observation\ is\ male \\
+                  0 & Otherwise
+                  \end{array}
+              \right.
+$$
+
+We fit the parallel regression lines model as follows:
+
+```{r reg2, echo = TRUE, eval = TRUE, warning = FALSE, message = FALSE}
+par.model <- lm(score ~ age + gender, data = eval.score)
+  get_regression_table(par.model) %>%
+#    dplyr::select(term, estimate) %>% #necessary to include dplyr here
+    kable(caption = "\\label{tab:reg2} Estimates of the parameters from the fitted parallel slopes regression model.") %>%
+    kable_styling(latex_options = "HOLD_position")
+```
+
+Hence, the regression line for females is given by:
+
+$$\widehat{score} = 4.48 - 0.009 \cdot age$$
+
+while the regression line for males is given by:
+
+$$\widehat{score} = 4.48 - 0.009 \cdot age + 0.191 = 4.671 - 0.009 \cdot age$$
+
+**From parallel regression lines model, what would be the teaching score of a female instructor aged 37?**
+
++ teaching score would be `r predict(par.model, data.frame(age=37, gender="female"))`
+
+**From parallel regression lines model, what would be the teaching score of a male instructor aged 52?**
+
++ teaching score would be `r predict(par.model, data.frame(age=52, gender="male"))`
+
+Now let's superimpose our parallel regression lines onto the scatterplot of teaching score against age:
+
+```{r scatter5, echo = FALSE, eval = TRUE, out.width = '70%', fig.pos="H", fig.align = "center", warning = FALSE, fig.cap = "\\label{fig:scatter5}Instructor evaluation scores by age and gender with parallel regression lines superimposed.  The points have been jittered."}
+
+coeff <- par.model %>%
+  coef() %>%
+  as.numeric()
+
+slopes <- eval.score %>%
+  group_by(gender) %>%
+  summarise(min = min(age), max = max(age)) %>%
+  mutate(intercept = coeff[1]) %>%
+  mutate(intercept = ifelse(gender == "male", intercept + coeff[3], intercept)) %>%
+  gather(point, age, -c(gender, intercept)) %>% #gathers columns into rows
+  
+  # See Data Wrangling Cheat Sheet
+  mutate(y_hat = intercept + age * coeff[2])
+  
+ggplot(eval.score, aes(x = age, y = score, color = gender)) +
+  geom_jitter() +
+  labs(x = "Age", 
+      y = "Teaching Score",
+      color = "Gender") +
+  geom_line(data = slopes, aes(y = y_hat), size = 1)
+
+```
+
+##Multiple Regression: Interaction Model
+There is an *interaction effect* if the associated effect of one variable depends on the value of another variable.  For example, the effect of age here will depend on whether the instructor is male or female, that is, the effect of age on teaching scores will differ by gender.  The interaction model can be written as:
+
+$$y_i = \alpha + \beta_1x_{1i} + \beta_2x_{2i} + \beta_3x_{1i} x_{2i} + \epsilon_i$$
+$$y_i = \alpha + \beta_{age} \cdot age_i + \beta_{male} \cdot \mathbb{I}_{\mbox{male}}(i) + \beta_{age,male} \cdot age_i \cdot \mathbb{I}_{\mbox{male}}(i) + \epsilon_i$$
+
+In order to fit an interaction term within our regression model we replace the <code>+</code> sign with the <code>*</code> sign:
+
+```{r reg3, echo = TRUE, eval = TRUE, warning = FALSE, message = FALSE}
+int.model <- lm(score ~ age * gender, data = eval.score)
+  get_regression_table(int.model) %>%
+#    dplyr::select(term, estimate) %>% #necessary to include dplyr here
+    kable(caption = "\\label{tab:reg3} Estimates of the parameters from the fitted interaction regression model.") %>%
+    kable_styling(latex_options = "HOLD_position")
+```
+
+Hence, the regression line for females is given by:
+
+$$\widehat{score} = 4.88 - 0.018 \cdot age$$
+
+while the regression line for males is given by:
+
+$$\widehat{score} = 4.88 - 0.018 \cdot age - 0.446 + 0.014 = 4.434 - 0.004 \cdot age$$
+
+Notice how the interaction model allows for different slopes for females and males (-0.018 and -0.004, respectively).  These fitted lines correspond to the fitted lines we first saw in Figure \ref{fig:scatter4} repeated in Figure \ref{fig:scatter6} below but without the jitter.
+
+```{r scatter6, echo = FALSE, eval = TRUE, out.width = '70%', fig.pos="H", fig.align = "center", warning = FALSE, fig.cap = "\\label{fig:scatter6}Instructor evaluation scores by age and gender with parallel regression lines superimposed.  The points have been jittered."}
+
+ggplot(eval.score, aes(x = age, y = score, color = gender)) + 
+  geom_point() + 
+  labs(x = "Age", y = "Teaching Score", color = "Gender") +
+  geom_smooth(method = "lm", se = FALSE)
+```
+
+**From interaction regression lines model, what would be the teaching score of a female instructor aged 37?**
+
++ teaching score would be `r predict(int.model, data.frame(age=37, gender="female"))`
+
+**From interaction regression lines model, what would be the teaching score of a male instructor aged 52?**
+
++ teaching score would be `r predict(int.model, data.frame(age=52, gender="male"))`
+
+Here, we can see that, although the intercept for male instructors may be lower, the associated average **decrease** in teaching score with every year increase in age (0.004) is not as severe as it is for female instructors (0.018)
+
+##Assessing Model Fit
+Now we assess the fit of the model by looking at plots of the residuals of the interaction model.  
 
 
+```{r scatter7, echo = FALSE, eval = TRUE, fig.width = 13, fig.align = "center", warning = FALSE, fig.cap = "\\label{fig:scatter7}Residuals vs. age by gender"}
+regression.points <- get_regression_points(int.model)
+
+ggplot(regression.points, aes(x = age, y = residual)) +
+  geom_point() +
+  labs(x = "age", 
+       y = "Residual") +
+  geom_hline(yintercept = 0, col = "blue", size = 1) + 
+  facet_wrap(~ gender)
+```
+
+```{r scatter8, echo = FALSE, eval = TRUE, fig.width = 13, fig.align = "center", warning = FALSE, fig.cap = "\\label{fig:scatter8}Residuals vs. fitted values"}
+ggplot(regression.points, aes(x = score_hat, y = residual)) +
+        geom_point() +
+        labs(x = "Fitted value", 
+            y = "Residual") +
+        geom_hline(yintercept = 0, col = "blue", size = 1)
+        facet_wrap(~ gender)
+```
 
 
+From Figure \ref{fig:scatter7} and Figure \ref{fig:scatter8} we see that the residuals do have mean zero and constant variability across all values of the explanatory variables.
+
+Finally, we can check if the residuals are normally distributed by producing histograms by gender:
+
+```{r hist2, echo = FALSE, eval = TRUE, out.width = '70%', fig.pos="H", fig.align = "center", warning = FALSE, fig.cap = "\\label{fig:scatter2}Histogram of residuals by gender."}
+ggplot(regression.points, aes(x = residual)) +
+  geom_histogram(binwidth = 0.25, color = "white") +
+  labs(x = "Residual") +
+  facet_wrap(~ gender)
+```
+
+The residuals do not appear to be normally distributed.  Both histograms are left-skewed (and more so for males).
 
 
 

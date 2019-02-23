@@ -348,7 +348,7 @@ Here, we can see that both <code>country</code> and <code>continent</code> are f
 ```{r}
 gapminder2007 %>%
   select(continent, lifeExp) %>%
-  skim() %>%
+  skim()
 ```
 
 The summary output for the numerical outcome variable <code>lifeExp</code> is the same as we have seen previously. However, for the categorical variable <code>continent</code> we obtain:
