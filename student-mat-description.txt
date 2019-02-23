@@ -1,0 +1,13 @@
+Data Analysis
+Group Project - Group 6
+
+1. Dataset: Student Performance
+
+2. Available from: http://archive.ics.uci.edu/ml/datasets/Student+Performance
+
+3. Data Set Information: This data approach student achievement in secondary education of two Portuguese schools. The data attributes include student grades, demographic, social and school related features) and it was collected by using school reports and questionnaires. Two datasets are provided regarding the performance in two distinct subjects: Mathematics (mat) and Portuguese language (por). In [Cortez and Silva, 2008], the two datasets were modeled under binary/five-level classification and regression tasks. Important note: the target attribute G3 has a strong correlation with attributes G2 and G1. This occurs because G3 is the final year grade (issued at the 3rd period), while G1 and G2 correspond to the 1st and 2nd period grades. It is more difficult to predict G3 without G2 and G1, but such prediction is much more useful (see paper source for more details).
+
+4. Question of interest:
+  5.1. Assessing the relationship between G3 (the final grade in Mathematics and Portugese) and parent's cohabitation status (Pstatus); i.e. Investigating whether parent's status has an effect on the final grade obtained by the students.
+5.2. Analysing whether there is a significant difference between the final grade obtained by males and females and whether the number of school absences (absences) affects the grade.
+5.3. Does the choice of school affects the final grade of the students?

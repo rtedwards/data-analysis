@@ -1,0 +1,674 @@
+---
+title: "Bootstrap Confidence Intervals"
+author: "Robert Edwards"
+date: "22 February 2019"
+output:
+  pdf_document:
+          latex_engine: pdflatex
+          number_sections: yes
+fig_caption: yes
+---
+
+```{r setup, echo = FALSE, eval = TRUE, warning = FALSE, message = FALSE}
+knitr::opts_chunk$set(echo = FALSE, eval = TRUE, warning = FALSE, message = FALSE, comment = NA)
+```
+
+```{r libraries}
+library(ggplot2)
+library(plotly)
+library(tidyr)
+library(dplyr)
+library(moderndive)
+library(skimr)
+library(kableExtra)
+library(gridExtra)
+library(janitor)
+library(infer)
+```
+
+#Introduction {#sec:Intro}
+In previous weeks we have seen many examples of calculating sample statistics such as means, percentiles, standard deviations and regression coefficients. These sample statistics are used as point estimates of population parameters which describe the population from which the sample of data was taken. That last sentence assumes you're familiar with concepts and terminology about sampling (e.g. from the Statistical Inference course in 1st Semester) so here is a summary of some key terms:
+
+1. **Population**: The population is a set of N observations of interest.
+
+2. **Population parameter**: A population parameter is a numerical summary value about the population. In most settings, this is a value that's unknown and you wish you knew it.
+
+3. **Census**: An exhaustive enumeration/counting of all observations in the population in order to compute the population parameter's numerical value exactly.
+When N is small, a census is feasible. However, when N is large, a census can get very expensive, either in terms of time, energy, or money.
+
+4. **Sampling**: Collecting a sample of size n of observations from the population. Typically the sample size n is much smaller than the population size N, thereby making sampling a much cheaper procedure than a census.
+It is important to remember that the lowercase n corresponds to the sample size and uppercase N corresponds to the population size, thus n???N.
+Point estimates/sample statistics: A summary statistic based on the sample of size n that estimates the unknown population parameter.
+
+5. **Representative sampling**: A sample is said be a representative sample if it "looks like the population". In other words, the sample's characteristics are a good representation of the population's characteristics.
+
+6. **Generalizability**: We say a sample is generalizable if any results based on the sample can generalize to the population.
+
+7. **Bias**: In a statistical sense, we say bias occurs if certain observations in a population have a higher chance of being sampled than others. We say a sampling procedure is unbiased if every observation in a population had an equal chance of being sampled.
+
+8. **Random sampling**: We say a sampling procedure is random if we sample randomly from the population in an unbiased fashion.
+
+##Inference via Sampling 
+The logic of inference via sampling is:
+
++ If the sampling of a sample of size $n$ is done at **random**, then
++ The sample is **unbiased** and **representative** of the population, thus
++ Any result based on the sample can **generalize** to the population, thus
++ The **point estimate/sample statistic** is an estimate of the unknown population parameter of interest
+
+and thus we have **inferred** something about the population based on our sample.
+
+
+##Task 1
+*In 2013 National Public Radio in the USA reported a poll of President Obama's approval rating among young Americans aged 18-29 in an article Poll: [Support For Obama Among Young Americans Eroding. Here is a quote from the article](https://www.npr.org/sections/itsallpolitics/2013/12/04/248793753/poll-support-for-obama-among-young-americans-eroding?t=1550838418397):*
+
+"After voting for him in large numbers in 2008 and 2012, young Americans are souring on President Obama.
+
+According to a new Harvard University Institute of Politics poll, just 41 percent of millennials (adults ages 18-29) approve of Obama's job performance, his lowest-ever standing among the group and an 11-point drop from April.""
+
+*Identify each of the following terms in this context. (NB. Do not enter any R code below, but you can access the solution by clicking "Hint".)*
+
++ Population: Millennials (Americans aged 18-29)
++ Population parameter: The true population proportion $p$ of young Americans who approve of Obama's job performeance.
++ Census: Young Americans and asking them if they approve of Obama's job performance.  
++ Sampling: One way is to get phone records from a dtabase and pick out $n$ phone numbers. 
++ Point estimates/sample statistics: Th sample proportion $\hat{p}$ of young Americans in the sample that approve of Obama's job performance.  
++ Representative sampling: Does the sampe of $n = 2089$ young Americans accurately represent the population of all young Americans age 18-29?
++ Generalizability: is $\hat{p} = 0.41$ a good estimate of $p$?
++ Bias: Are there any sources of bias in the study?  Sampling bias, self-selection bias...
++ Random sampling: Was the sampling randomly done?
+
+#Inference Using Sample Statistics {#sec:Inference}
+Scenario	Population parameter	                Population Notation	   Point estimate/sample statistic	    Sample Notation
+--------- ------------------------------------- ---------------------  ---------------------------------  ----------------------
+1	        Population proportion	                $p$	                   Sample proportion	                $\hat{p}$
+2	        Population mean	                      $\mu$	                 Sample mean	                      $\bar{x}$
+3	        Difference in population proportions	$p_1-p_2$	             Difference in sample proportions	  $\hat{p}_1-\hat{p}_2$
+4	        Difference in population means	      $\mu_1-\mu_2$	         Difference in sample means	        $\bar{x}_1-\bar{x}_2$
+5	        Population regression intercept	      $\beta_0$	             Sample regression intercept	      $\hat{\beta}_0~or~b_0$
+6	        Population regression slope	          $\beta_1$	             Sample regression slope	          $\hat{\beta}_1~or~b_1$
+--------- ------------------------------------- ---------------------  ---------------------------------  ----------------------
+
+#Bootstrapping {#sec:Bootstrapping}
+The moderndive package contains a sample of 40 pennies collected and minted in the United States. Let's explore this sample data first: The `pennies_sample` data frame has rows corresponding to a single penny with two variables:
+
++ `year` of minting as shown on the penny and
++ `age_in_2011` giving the years the penny had been in circulation in 2011 as an integer, e.g. 15, 2, etc.
+
+Suppose we are interested in understanding some properties of the mean age of all US pennies from this data collected in 2011. How might we go about that? Let's begin by understanding some of the properties of `pennies_sample` using data wrangling from Week 2 and data visualization from Week 1.
+
+##EDA
+First, let's visualize the values in this sampl as a histogram:
+
+```{r summary, echo = TRUE, eval = TRUE, warning = FALSE, message = FALSE}
+ggplot(pennies_sample, aes(x = age_in_2011)) +
+  geom_histogram(bins = 10, color = "white") 
+```
+
+We see a roughly symmetric distribution here that has quite a few values near 20 years in age with only a few larger than 40 years or smaller than 5 years. If `pennies_sample` is a representative sample from the population, we'd expect the age of all US pennies collected in 2011 to have a similar shape, a similar spread, and similar measures of central tendency like the mean.
+
+So where does the mean value fall for this sample? This point will be known as our **point estimate** and provides us with a single number that could serve as the guess to what the true population mean age might be. Recall how to find this using the `dplyr` package:
+
+```{r mean, echo = TRUE, eval = TRUE, warning = FALSE, message = FALSE}
+x_bar <- pennies_sample %>%
+  summarize(stat = mean(age_in_2011))
+```
+We've denoted this sample mean as $\hat{x}$, which is the standard symbol for denoting the mean of a sample. Our point estimate is, thus, $\hat{x}=25.1$. Note that this is just one sample providing just one sample mean to estimate the population mean. To construct a **confidence interval** (and to do any sort of *statistical inference* for that matter) we need to know about the **sampling distribution** of this sample mean, i.e. how would its values vary if many samples of the same size were drawn from the same population.
+
+The process of **bootstrapping** allows us to use a single sample to generate many different samples that will act as our way of approximating a sampling distribution using a created **bootstrap distribution** instead. We will "pull ourselves up by our bootstraps" (as the saying goes in English, see here) using a single sample (`pennies_sample`) to get an idea of the **sampling distribution** of the sample mean.
+
+##The Bootstrapping Process
+Bootstrapping uses a process of sampling **with replacement** from our original sample to create new **bootstrap samples** of the *same size* as our original sample. We can use the `rep_sample_n()` function in the `infer` package to explore what one such bootstrap sample would look like. Remember that we are randomly sampling from the original sample here **with replacement** and that we always use the same sample size for the bootstrap samples as the size of the original sample (`pennies_sample`).
+
+```{r sample1, echo = TRUE, eval = TRUE, warning = FALSE, message = FALSE}
+bootstrap_sample1 <- pennies_sample %>% 
+  rep_sample_n(size = 40, replace = TRUE, reps = 1)
+
+ggplot(bootstrap_sample1, aes(x = age_in_2011)) +
+  geom_histogram(bins = 10, color = "white")
+```
+
+
+We now have another sample from what we could assume comes from the population of interest. We can similarly calculate the sample mean of this bootstrap sample, called a **bootstrap statistic**.
+
+```{r mean1, echo = TRUE, eval = TRUE, warning = FALSE, message = FALSE}
+bootstrap_sample1 %>% 
+  summarize(stat = mean(age_in_2011))
+```
+
+We'll come back to analyzing the variation in the values of different bootstrap samples' statistics shortly. But first, let's recap what was done to get to this single bootstrap sample using a tactile explanation:
+
+1. First, pretend that each of the 40 values of `age_in_2011` in  `pennies_sample` were written on a small piece of paper. Recall that these values were 6, 30, 34, 19, 6, etc.
+2. Now, put the 40 small pieces of paper into a receptacle such as a baseball cap.
+3. Shake up the pieces of paper.
+4. Draw "at random" from the cap to select one piece of paper.
+5. Write down the value on this piece of paper. Say that it is 28.
+6. Now, place this piece of paper containing 28 back into the cap.
+7. Draw "at random" again from the cap to select a piece of paper. Note that this is the sampling with replacement part since you may draw 28 again.
+8. Repeat this process until you have drawn 40 pieces of paper and written down the values on these 40 pieces of paper. Completing this repetition produces ONE bootstrap sample.
+
+If you look at the values in `bootstrap_sample1`, you can see how this process plays out. We originally drew 28, then we drew 11, then 7, and so on. Of course, we didn't actually use pieces of paper and a cap here. We just had the computer perform this process for us to produce `bootstrap_sample1` using  `rep_sample_n()` with `replace = TRUE` set.
+
+The process of *sampling with replacement* is how we can use the original sample to take a guess as to what other values in the population may be. Sometimes in these bootstrap samples, we will select lots of larger values from the original sample, sometimes we will select lots of smaller values, and most frequently we will select values that are near the center of the sample. Let's explore what the distribution of values of `age_in_2011` for six different bootstrap samples looks like to further understand this variability.
+
+```{r sample6, echo = TRUE, eval = TRUE, warning = FALSE, message = FALSE}
+six_bootstrap_samples <- pennies_sample %>% 
+  rep_sample_n(size = 40, replace = TRUE, reps = 6)
+
+ggplot(six_bootstrap_samples, aes(x = age_in_2011)) +
+  geom_histogram(bins = 10, color = "white") +
+  facet_wrap(~ replicate)
+```
+
+We can also look at the six different means using `dplyr` syntax:
+
+```{r mean6, echo = TRUE, eval = TRUE, warning = FALSE, message = FALSE}
+six_bootstrap_samples %>% 
+  group_by(replicate) %>% 
+  summarize(stat = mean(age_in_2011))
+```
+
+Instead of doing this six times, we could do it 1000 times and then look at the distribution of `stat` across all 1000 of the `replicates`. This sets the stage for the `infer` R package (see documentation here or the "Cheat Sheet" on the DA Moodle page) that helps users perform statistical inference such as confidence intervals and hypothesis tests using verbs similar to what you've seen with  `dplyr`. In the next section we'll walk through setting up each of the infer verbs for confidence intervals using this `pennies_sample` example, while also explaining the purpose of the verbs in a general framework.
+
+#Infer Package for Statistical Inference {#sec:Infer}
+The `infer` package makes great use of the `tidyverse` "pipe" `%>%` to create a pipeline for statistical inference. The goal of the package is to provide a way for its users to explain the computational process of confidence intervals and hypothesis tests using the code as a guide. The verbs build in order here, so you'll want to start with `specify()` and then continue through the others as needed.
+
+##Specify Variables
+\begin{center}
+\includegraphics[width=0.25\textwidth]{specify.png}
+\end{center}
+
+The `specify()` function is used primarily to choose which variables will be the focus of the statistical inference. In addition, a setting of which variable will act as the `explanatory` and which acts as the `response` variable is done here. For proportion problems (i.e. Scenarios 1 & 3 in Table 1) we also specify which of the different levels we are calculating the proportion of (e.g. "females", "approve of Obama's job performance", etc.).
+To begin to create a confidence interval for the population mean age of US pennies in 2011, we start by using `specify()` to choose which variable in our  `pennies_sample` data we'd like to work with. This can be done in one of two ways:
+
+1. Using the `response` argument:
+
+```{r response, echo = TRUE, eval = TRUE, warning = FALSE, message = FALSE}
+pennies_sample %>% 
+  specify(response = age_in_2011)
+```
+
+2. Using `formula` notation:
+
+```{r formula, echo = TRUE, eval = TRUE, warning = FALSE, message = FALSE}
+pennies_sample %>% 
+  specify(formula = age_in_2011 ~ NULL)
+```
+
+Note that the formula notation uses the common R methodology to include the response $y$ variable on the left of the `~` and the explanatory $x$ variable on the right of the "tilde." Recall that you used this notation frequently with the `lm()` function in Weeks 4 and 6 when fitting regression models. Either notation works just fine, but a preference is usually given here for the `formula` notation to further build on the ideas from earlier chapters.
+
+##Generate Replicates
+\begin{center}
+\includegraphics[width=0.5\textwidth]{generate.png}
+\end{center}
+
+After `specify()ing` the variables we'd like in our inferential analysis, we next feed that into the  `generate()` verb. The `generate()` verb's main argument is `reps`, which is used to give how many different repetitions one would like to perform. Another argument here is `type`, which is automatically determined by the kinds of variables passed into `specify()`. We can also be explicit and set this `type` to be `type = "bootstrap"`. Make sure to check out `?generate` to see the options here and use the `?` operator to better understand other verbs as well.
+Let's `generate()` 1000 bootstrap samples:
+
+```{r samples1000, echo = TRUE, eval = TRUE, warning = FALSE, message = FALSE}
+thousand_bootstrap_samples <- pennies_sample %>%
+  specify(response = age_in_2011) %>%
+  generate(reps = 1000, type = "bootstrap")
+```
+
+We can use the `dplyr` `count()` function to help us understand what the `thousand_bootstrap_samples` data frame looks like:
+
+```{r mean1000, echo = TRUE, eval = TRUE, warning = FALSE, message = FALSE}
+thousand_bootstrap_samples %>% count(replicate)
+# Equivalent to:
+# thousand_bootstrap_samples %>% 
+#   group_by(replicate) %>% 
+#   summarise(n=n())
+```
+
+Notice that each `replicate` has 40 entries here. Now that we have 1000 different bootstrap samples, our next step is to `calculate` the bootstrap statistics for each sample.
+
+##Calculate Summary Statistics
+\begin{center}
+\includegraphics[width=0.5\textwidth]{calculate.png}
+\end{center}
+
+After `generate()`ing many different samples, we next want to condense those samples down into a single statistic for each `replicate`d sample. As seen in the diagram, the `calculate()` function is helpful here.
+
+As we did at the beginning of this chapter, we now want to calculate the mean `age_in_2011` for each bootstrap sample. To do so, we use the `stat` argument and set it to `"mean"` below. The `stat` argument has a variety of different options here and we will see further examples of this throughout the remaining chapters.
+
+```{r calculate, echo = TRUE, eval = TRUE, warning = FALSE, message = FALSE}
+bootstrap_distribution <- pennies_sample %>% 
+  specify(response = age_in_2011) %>% 
+  generate(reps = 1000) %>% 
+  calculate(stat = "mean")
+bootstrap_distribution
+```
+
+**Observed statistic / point estimate calculations**
+Just as `group_by() %>% summarize()` produces a useful workflow in `dplyr`, we can also use  `specify() %>% calculate()` to compute summary measures on our original sample data. It's often helpful both in confidence interval calculations and in hypothesis testing to identify what the corresponding statistic is in the original data. For our example on penny age, we computed above a value of `x_bar` using the `summarize()` verb in `dplyr`:
+
+```{r summarize, echo = TRUE, eval = TRUE, warning = FALSE, message = FALSE}
+pennies_sample %>% 
+  summarize(stat = mean(age_in_2011))
+```
+
+This can also be done by skipping the `generate()` step in the pipeline feeding `specify()` directly into  `calculate()`:
+
+```{r summarize2, echo = TRUE, eval = TRUE, warning = FALSE, message = FALSE}
+pennies_sample %>% 
+  specify(response = age_in_2011) %>% 
+  calculate(stat = "mean")
+```
+
+This shortcut will be particularly useful when the calculation of the observed statistic is tricky to do using  `dplyr` alone. This is particularly the case when working with more than one variable.
+
+##Visualize the Results
+\begin{center}
+\includegraphics[width=0.5\textwidth]{visualize.png}
+\end{center}
+
+The `visualize()` verb provides a simple way to view the bootstrap distribution as a histogram of the  `stat` variable values. It has many other arguments that one can use as well including the shading of the histogram values corresponding to the confidence interval values.
+
+```{r visualize, echo = TRUE, eval = TRUE, warning = FALSE, message = FALSE}
+bootstrap_distribution %>%
+  visualize()
+```
+
+The shape of this resulting distribution may look familiar to you. It resembles the well-known normal (bell-shaped) curve. It is, in fact, an estimate of the **sampling variability** of the sample statistic. If you think back to *Statistical Inference* in Semester 1 you will remember that the *Central Limit Theorem* predicted that the sampling distribution would be a **normal distribution**, as seen in the bell-shaped distribution here.
+
+The following diagram recaps the `infer` pipeline for creating a bootstrap distribution.
+
+\begin{center}
+\includegraphics[width=0.5\textwidth]{ci_diagram.png}
+\end{center}
+
+#Constructing Confidence Intervals {#sec:CI}
+**confidence interval**: a range of plausible values for a population parameter. It depends on a specified confidence level with higher *confidence levels* corresponding to wider confidence intervals and lower confidence levels corresponding to narrower confidence intervals. Common confidence levels include 90%, 95%, and 99%.
+
+**Confidence intervals** play an important role in the sciences and any field that uses data. You can think of a confidence interval as playing the role of a net when fishing. Instead of just trying to catch a fish with a single spear (estimating an unknown parameter by using a single point estimate/sample statistic), we can use a net to try to provide a range of possible locations for the fish (use a range of possible values based around our sample statistic to make a plausible guess as to the location of the parameter).
+
+The bootstrapping process provides bootstrap statistics that have a bootstrap distribution with center at (or extremely close to) the mean of the original sample. This can be seen by giving the observed statistic  `obs_stat` argument the value of the point estimate `x_bar`.
+
+```{r visualize2, echo = TRUE, eval = TRUE, warning = FALSE, message = FALSE}
+bootstrap_distribution %>%
+  visualize(obs_stat = x_bar)
+```
+
+We can also compute the mean of the bootstrap distribution of means to see how it compares to `x_bar`:
+
+```{r summarize3, echo = TRUE, eval = TRUE, warning = FALSE, message = FALSE}
+bootstrap_distribution %>%
+  summarize(mean_of_means = mean(stat))
+```
+
+##The Percentile Method
+One way to calculate a range of plausible values for the unknown mean age of coins in 2011 is to use the middle 95% of the `bootstrap_distribution` to determine our endpoints. Our endpoints are thus at the 2.5th and 97.5th percentiles. This can be done with `infer` using the `get_ci()` function. (You can also use the `conf_int()` or `get_confidence_interval()` functions here as they are aliases that work the exact same way.)
+
+```{r get_ci, echo = TRUE, eval = TRUE, warning = FALSE, message = FALSE}
+bootstrap_distribution %>% 
+  get_ci(level = 0.95, type = "percentile")
+```
+
+These options are the default values for `level` and `type` so we can also just do:
+
+```{r get_ci2, echo = TRUE, eval = TRUE, warning = FALSE, message = FALSE}
+percentile_ci <- bootstrap_distribution %>% 
+  get_ci()
+percentile_ci
+```
+
+Using the percentile method, our range of plausible values for the mean age of US pennies in circulation in 2011 is 20.97 years to 29.25 years. We can use the `visualize()` function to view this using the  `endpoints` and `direction` arguments, setting `direction` to `"between"` (between the values) and  `endpoints` to be those stored with name `percentile_ci`.
+
+```{r visualize3, echo = TRUE, eval = TRUE, warning = FALSE, message = FALSE}
+bootstrap_distribution %>% 
+  visualize(endpoints = percentile_ci, direction = "between")
+```
+
+You can see that 95% of the data stored in the `stat` variable in `bootstrap_distribution` falls between the two endpoints with 2.5% to the left outside of the shading and 2.5% to the right outside of the shading. The cut-off points that provide our range are shown with the darker lines.
+
+##The Standard Error Method
+If the bootstrap distribution is close to symmetric and bell-shaped, we can also use a shortcut formula for determining the lower and upper endpoints of the confidence interval. This is done by using the formula $\bar{x}±(multiplier???SE)$, where $\bar{x}$ is our original sample mean and $SE$ stands for **standard error** and corresponds to the standard deviation of the bootstrap distribution.
+
+**Definition**: The *stnadard error* is the standard deviation of the sampling distribution. 
+
+The variability of the sampling distribution may be approximated by the variability of the bootstrap distribution. Traditional theory-based methodologies for inference also have formulas for standard errors, assuming some conditions are met (you will have (seen some of these)[https://moodle.gla.ac.uk/pluginfile.php/1813455/mod_resource/content/1/Interval%20Estimates%20Summary.pdf] in Statistical Inference in Semester 1).
+
+The value of *multiplier* here is the appropriate percentile of the standard normal distribution. This is automatically calculated when `level` is provided with `level = 0.95` being the default. (95% of the values in a standard normal distribution fall within 1.96 standard deviations of the mean, so  `multiplier = 1.96` corresponds to `level = 0.95`, for example.) As mentioned, this formula assumes that the bootstrap distribution is symmetric and bell-shaped. This is often the case with bootstrap distributions, especially those in which the original distribution of the sample is not highly skewed.
+
+This $\bar{x}±(multiplier???SE)$ formula is implemented in the `get_ci()` function as shown with our pennies problem using the bootstrap distribution's variability as an approximation for the sampling distribution's variability. We'll see more on this approximation shortly.
+
+Note that the center of the confidence interval (the `point_estimate`) must be provided for the standard error confidence interval.
+
+```{r get_ci3, echo = TRUE, eval = TRUE, warning = FALSE, message = FALSE}
+standard_error_ci <- bootstrap_distribution %>% 
+  get_ci(type = "se", point_estimate = x_bar)
+standard_error_ci
+
+bootstrap_distribution %>% 
+  visualize(endpoints = standard_error_ci, direction = "between")
+```
+
+We see that both methods produce nearly identical confidence intervals with the percentile method being [$20.97,29.25$] and the standard error method being [$20.97,29.28$].
+
+#Interpreting the Confidence Interval
+Recall that the confidence intervals we've produced are based on bootstrapping using the single sample `pennies_sample`. We have been claiming that this is a sample from all the pennies in circulation in 2011, but we can now reveal that it is actually a sample from a larger number of pennies stored as `pennies` in the `moderndive` package. The `pennies` data frame contains 800 rows of data and two columns pertaining to the same variables as `pennies_sample`. Its important to stress that this is *very artificial*, i.e. we would usually never have access to all the information about the larger group from which our sample is taken, but we have set up the data this way here to illustrate the properties of confidence intervals for the purpose of interpreting confidence intervals.
+
+So let's assume that `pennies` is our population of interest (i.e. a population with $N=800$ units). We can therefor calculate the population mean age of pennies in 2011, denoted by the Greek letter $\mu$, by calculating the mean of `age_in_2011` for the `pennies` data frame.
+
+```{r mean4, echo = TRUE, eval = TRUE, warning = FALSE, message = FALSE}
+pennies_mu <- pennies %>% 
+  summarize(overall_mean = mean(age_in_2011)) %>% 
+  pull()  #Use this function to extract the single value from the data frame
+pennies_mu
+```
+
+As we saw at the end of the previous section, one range of plausible values for the population mean age of pennies in 2011 ($\mu$), is [$20.97,29.25$]. Note that the value $\mu=21.15$ (i.e.the mean of `pennies` calculated above) **does** fall in this confidence interval. So in this instance, the confidence interval based on `pennies_sample` was a good estimate of $\mu$.
+
+If we had a different sample of size 40 and constructed a confidence interval using the same method, would we be guaranteed that it contained the population parameter value $\mu$ as well? Let's try it out:
+
+```{r samples2, echo = TRUE, eval = TRUE, warning = FALSE, message = FALSE}
+pennies_sample2 <- pennies %>%
+  sample_n(size = 40)
+```
+
+Note the use of the `sample_n()` function in the `dplyr` package here. This does the same thing as  `rep_sample_n(reps = 1)` but omits the extra replicate column.
+
+We next create an `infer` pipeline to generate a percentile-based 95% confidence interval for $\mu$:
+
+```{r get_ci4, echo = TRUE, eval = TRUE, warning = FALSE, message = FALSE}
+percentile_ci2 <- pennies_sample2 %>% 
+  specify(formula = age_in_2011 ~ NULL) %>% 
+  generate(reps = 1000) %>% 
+  calculate(stat = "mean") %>% 
+  get_ci()
+percentile_ci2
+```
+
+This new confidence interval also contains the value of $\mu$. Let's further investigate by repeating this process 100 times to get 100 different confidence intervals derived from 100 different samples of  `pennies`. Each sample will have size of 40 just as the original sample. We will plot each of these confidence intervals as horizontal lines. We will also show a line corresponding to the known population value of 21.1525 years.
+
+\begin{center}
+\includegraphics[width=0.5\textwidth]{ci_95.png}
+\end{center}
+
+Of the 100 confidence intervals based on samples of size $n = 40$, 96 of them captured the population mean $\mu=21.15$, whereas 4 of them did not include it. If we repeated this process of building confidence intervals more times with more samples, we'd expect 95% of them to contain the population mean. In other words, the procedure we have used to generate confidence intervals is "95% reliable" in that we can expect it to include the true population parameter 95% of the time if the process is repeated.
+
+To further accentuate this point, let's perform a similar procedure using 90% confidence intervals instead. This time we will use the standard error method instead of the percentile method for computing the confidence intervals.
+
+\begin{center}
+\includegraphics[width=0.5\textwidth]{ci_90.png}
+\end{center}
+
+Repeating this process for more samples would result in us getting closer and closer to 90% of the confidence intervals including the true value. It is common to say while interpreting a confidence interval to be "95% confident" or "90% confident" that the specified confidence interval contains the true value. We will use this "confident" language throughout the rest of this chapter, but remember that it is a theoretical statement about what we would expect to happen if we to sample again and again from the same population (which we don't do in practice, of course).
+
+#Comparing Two Proportions
+Let's start with an example. If you see someone else yawn, are you more likely to yawn? In an episode of the TV show Mythbusters, they tested the myth that yawning is contagious.
+Fifty adults who thought they were being considered for an appearance on the show were interviewed by a show recruiter ("confederate") who either yawned or did not. Participants then sat by themselves in a large van and were asked to wait. While in the van, the Mythbusters watched via hidden camera to see if the unaware participants yawned. The data frame containing the results is available at `mythbusters_yawn` in the `moderndive` package. Let's check it out.
+
+```{r yawn, echo = TRUE, eval = TRUE, warning = FALSE, message = FALSE}
+mythbusters_yawn
+```
+
++ The participant ID is stored in the `subj` variable with values of 1 to 50.
++ The `group` variable is either `"seed"` for when a confederate was trying to influence the participant or `"control"` if a confederate did not interact with the participant.
++ The `yawn` variable is either `"yes"` if the participant yawned or `"no"` if the participant did not yawn.
+
+We can use the `janitor` package to get a glimpse into this data in a table format:
+
+```{r yawn_summary, echo = TRUE, eval = TRUE, warning = FALSE, message = FALSE}
+mythbusters_yawn %>%
+  tabyl(group, yawn) %>%
+  adorn_percentages() %>%
+  adorn_pct_formatting() %>%
+  adorn_ns() # To show original counts
+```
+
+We are interested in comparing the proportion of those that yawned after seeing a `seed` versus those that yawned with no seed interaction (i.e. `control`). We'd like to see if the difference between these two proportions is significantly larger than 0. If so, we'd have evidence to support the claim that yawning is contagious based on this study.
+
+In looking over this problem, we can take note of some important details to include in our `infer` pipeline:
+
++ We are calling a "`success`" having a `yawn` value of `yes`.
++ Our response variable will always correspond to the variable used in the `success` so the response variable is `yawn`.
++ The explanatory variable is the other variable of interest here: `group`.
+
+##Compute the Point Estimate
+We are examining the relationship between yawning and whether or not the participant saw someone yawn (`seed`) or not (`control`).
+
+```{r yawn_specify, echo = TRUE, eval = TRUE, warning = FALSE, message = FALSE}
+mythbusters_yawn %>%
+  specify(formula = yawn ~ group, success = "yes")
+```
+
+We next want to calculate the statistic of interest for our sample. This corresponds to the difference in the proportion of successes.
+
+```{r yawn_calculate, echo = TRUE, eval = TRUE, warning = FALSE, message = FALSE}
+obs_diff <- mythbusters_yawn %>%
+  specify(formula = yawn ~ group, success = "yes") %>%
+  calculate(stat = "diff in props", order = c("seed", "control")) # the order in which R should subtract these proportions of successes
+obs_diff
+```
+
+This value represents the proportion of those that yawned after seeing a seed yawn (0.2941) minus the proportion of those that yawned with not seeing a seed (0.25).
+
+##Bootstrap Distribution
+Our next step in building a confidence interval is to create a bootstrap distribution of statistics (differences in proportions of successes). We saw how it works with a single variable in computing bootstrap means in the `pennies` example but we haven't yet worked with bootstrapping involving multiple variables, i.e. comparing two groups. In the `infer` package, bootstrapping with multiple variables means that each **row** is potentially resampled. Let's investigate this by looking at the first few rows of `mythbusters_yawn`:
+
+```{r yawn_head, echo = TRUE, eval = TRUE, warning = FALSE, message = FALSE}
+head(mythbusters_yawn)
+```
+
+When we bootstrap this data, we are potentially pulling the subject's readings multiple times. Thus, we could see the entries of `"seed"` for `group` and `"no"` for `yawn` together in a new row in a bootstrap sample. This is further seen by exploring the `sample_n()` function in `dplyr` on this smaller 6 row data frame comprised of `head(mythbusters_yawn)`. The `sample_n()` function can perform this bootstrapping procedure and is similar to the `rep_sample_n()` function in `infer`, except that it is not `rep`eated but rather only performs one sample with or without replacement.
+
+```{r yawn_sample, echo = TRUE, eval = TRUE, warning = FALSE, message = FALSE}
+set.seed(2019)
+head(mythbusters_yawn) %>%
+  sample_n(size = 6, replace = TRUE)
+```
+
+We can see that in this bootstrap sample generated from the first six rows of `mythbusters_yawn`, we have some rows repeated. The same is true when we perform the `generate()` step in `infer` as done below.
+
+```{r yawn_generate, echo = TRUE, eval = TRUE, warning = FALSE, message = FALSE}
+bootstrap_distribution <- mythbusters_yawn %>% 
+  specify(formula = yawn ~ group, success = "yes") %>% 
+  generate(reps = 1000) %>% 
+  calculate(stat = "diff in props", order = c("seed", "control"))
+bootstrap_distribution %>% visualize(bins = 20)
+```
+
+This distribution is roughly symmetric and bell-shaped but isn't quite there. Let's use the percentile-based method to compute a 95% confidence interval for the true difference in the proportion of those that yawn with and without a seed presented. The arguments are explicitly listed here but remember they are the defaults and simply `get_ci()` can be used.
+
+```{r yawn_get_ci, echo = TRUE, eval = TRUE, warning = FALSE, message = FALSE}
+bootstrap_distribution %>% 
+  get_ci(type = "percentile", level = 0.95)
+```
+
+*The confidence interval shown here is (-0.22, 0.29) and thus includes the value of 0. Therefore zero is a plausible value for the difference in the proportion of people that yawned with and without seeing someone yawn which is inconclusive evidence of a relationship between seeing someone yawn and yawning*
+
+Therefore, we are not sure which proportion is larger. Some of the bootstrap statistics showed the proportion without a seed to be higher and others showed the proportion with a seed to be higher. If the confidence interval was entirely above zero, we would be relatively sure (about "95% confident") that the seed group had a higher proportion of yawning than the control group.
+
+Note that this all relates to the importance of denoting the `order` argument in the `calculate()` function. Since we specified `"seed"` and then `"control"` positive values for the statistic correspond to the `"seed"` proportion being higher, whereas negative values correspond to the `"control"` group being higher.
+
+We, therefore, have evidence via this confidence interval suggesting that the conclusion from the Mythbusters show that "yawning is contagious" being "confirmed" is **not** statistically correct.
+
+#Further Tasks
+##Confidence Intervals for Yawn Data
+In the last section, we constructed a confidence interval for the difference in the proportion of people who yawned between the "seeded" group and the "control" group (Scenario 3).
+
+By modifying the code in the last section in light of how we constructed a confidence interval for the age of pennies in the section on "Constructing confidence intervals" (Scenario 2), use  mythbusters_yawn data to constuct a confidence interval for the proportion of people who yawn when they see someone else yawn (Scenario 1). Does this overlap with the confidence interval for the proportion of people who yawn when they did not see someone else yawn (Scenario 1 again!)? Are your findings here consistent with the findings in the last section?
+
+```{r yawn_get_ci2, echo = TRUE, eval = TRUE, warning = FALSE, message = FALSE}
+bootstrap_distribution <- mythbusters_yawn %>%
+  filter(group=="seed") %>%
+  specify(formula = yawn ~ NULL, success = "yes") %>%
+  generate(reps = 1000) %>%
+  calculate(stat = "prop")
+bootstrap_distribution %>% visualize(bins = 20)
+```
+
+This distribution is roughly symmetric and bell-shaped but isn't quite there. Let's use the percentile-based
+method to compute a 95% confidence interval for the true proportion of those that yawn with a seed presented.
+The arguments are explicitly listed here but remember they are the defaults and simply get_ci() can be
+used.
+
+```{r yawn_get_ci3, echo = TRUE, eval = TRUE, warning = FALSE, message = FALSE}
+bootstrap_distribution %>%
+  get_ci(type = "percentile", level = 0.95)
+```
+
+The confidence interval shown here is (0.15, 0.44). The range of plausible values for the proportion of people
+that yawned with after seeing someone yawn is therefore between 0.15 and 0.44.
+We now repeat the exercise but for the group that didn't see someone yawn, i.e. `group == "control"`
+
+```{r yawn_get_ci4, echo = TRUE, eval = TRUE, warning = FALSE, message = FALSE}
+bootstrap_distribution <- mythbusters_yawn %>%
+  filter(group=="control") %>%
+  specify(formula = yawn ~ NULL, success = "yes") %>%
+  generate(reps = 1000) %>%
+  calculate(stat = "prop")
+bootstrap_distribution %>% visualize(bins = 20)
+
+bootstrap_distribution %>%
+  get_ci(type = "percentile", level = 0.95)
+```
+
+Setting `type = "bootstrap"` in `generate()`.
+The confidence interval shown here is (0.06, 0.5). The range of plausible values for the proportion of people
+that yawned without seeing someone yawn is therefore between 0.06 and 0.5.
+
+Comparing the two CIs for the proportion of those that saw someone yawn (0.15, 0.44) and those that didn't
+(0.06, 0.5), we note that these two CIs overlap, which is consistent with the findings from the CI for the
+difference in the two proptions (-0.23, 0.31) in the last section, i.e. since they **do overlap** its plausible that they could each take the *same value* and therefore its plausible that their **difference is zero**, which is exactly what the CI for the difference in proportions tells us.
+
+## Confidence Interval for Cats Data
+Recall the data on 144 domestic male and female adult cats that we first saw in Week 4. Each cat had
+their heart weight in grams (Hwt) and body weight in kilograms (Bwt) measured, and interest lies in
+exploring difference between females and males.
+a. Construct a bootstrap confidence intervals for the avearge heart weight of female and male cats
+separately? Interpret your results.
+b. Construct a bootstrap confidence interval for the difference in the avearge heart weights of female
+and male cats. Interpret your result.
+c. Repeat a. and b. for the body weight of cats.
+Hint: You need to read in the cats data and remind yourself how it is organised, e.g.
+
+```{r cats_summary, echo = TRUE, eval = TRUE, warning = FALSE, message = FALSE}
+cats <- read.csv("cats.csv")
+glimpse(cats)
+```
+
+**Solution 2.a.**
+
+a. Construct a bootstrap confidence intervals for the avearge heart weight of female and male cats
+separately? Interpret your results.
+
+We start by focusing on female cats, i.e. Sex == "F":
+
+```{r cats_wgt_female, echo = TRUE, eval = TRUE, warning = FALSE, message = FALSE}
+cats <- read.csv("cats.csv")
+#glimpse(cats)
+bootstrap_distribution <- cats %>%
+  filter(Sex == "F") %>%
+  specify(response = Hwt) %>%
+  generate(reps = 1000) %>%
+  calculate(stat = "mean")
+
+#bootstrap_distribution %>% visualize()
+ 
+percentile_ci <- bootstrap_distribution %>%
+  get_ci()
+#percentile_ci
+```
+
+Using the percentile method, our range of plausible values for the mean heart weight of female adult cats is
+8.82 grams to 9.58 grams.
+
+Now repeat the analysis for male cats, i.e. Sex == "M":
+
+```{r cats_wgt_male, echo = TRUE, eval = TRUE, warning = FALSE, message = FALSE}
+bootstrap_distribution <- cats %>%
+  filter(Sex == "M") %>%
+  specify(response = Hwt) %>%
+  generate(reps = 1000) %>%
+  calculate(stat = "mean")
+
+#bootstrap_distribution %>% visualize()
+percentile_ci <- bootstrap_distribution %>%
+  get_ci()
+#percentile_ci
+```
+
+Using the percentile method, our range of plausible values for the mean heart weight of male adult cats is
+10.83 grams to 11.79 grams.
+
+**Solution 2.b.**
+
+b. Construct a bootstrap confidence interval for the difference in the avearge heart weights of female and
+male cats. Interpret your result.
+
+```{r cats_hwt_diff, echo = TRUE, eval = TRUE, warning = FALSE, message = FALSE}
+bootstrap_distribution <- cats %>%
+  specify(Hwt~Sex) %>%
+  generate(reps = 1000) %>%
+  calculate(stat = "diff in means", order = c("F", "M"))
+  percentile_ci <- bootstrap_distribution %>%
+  get_ci()
+```
+
+Using the percentile method, our range of plausible values for the difference in the mean heart weight between
+female and male adult cats is -2.77 grams to -1.45 grams. That is to say that on average female adult
+cats' hearts weigh between 1.45 and 2.77 grams less than adult male cats' hearts. (Note: the fact that the
+individual CIs in part a. didn't overlap told us that zero wouldn't be in the interval for the difference in the
+population means)
+
+**Solution 2.c.**
+
+c. Repeat a. and b. for the body weight of cats.
+
+RMarkdown makes it very easy to repeat the analysis in parts a. and b. on a different variable.
+
+```{r cats_bwt_female, echo = TRUE, eval = TRUE, warning = FALSE, message = FALSE}
+cats <- read.csv("cats.csv")
+bootstrap_distribution <- cats %>%
+  filter(Sex == "F") %>%
+  specify(response = Bwt) %>%
+  generate(reps = 1000) %>%
+  calculate(stat = "mean")
+percentile_ci <- bootstrap_distribution %>%
+  get_ci()
+```
+
+Using the percentile method, our range of plausible values for the mean body weight of female adult cats is
+2.28 kilograms to 2.43 kilograms.
+
+Now repeat the analysis for male cats, i.e. Sex == "M":
+
+```{r cats_bwt_male, echo = TRUE, eval = TRUE, warning = FALSE, message = FALSE}
+bootstrap_distribution <- cats %>%
+  filter(Sex == "M") %>%
+  specify(response = Bwt) %>%
+  generate(reps = 1000) %>%
+  calculate(stat = "mean")
+percentile_ci <- bootstrap_distribution %>%
+  get_ci()
+```
+
+Using the percentile method, our range of plausible values for the mean body weight of male adult cats is
+2.82 kilograms to 2.99 kilograms.
+
+```{r cats_bwt_diff, echo = TRUE, eval = TRUE, warning = FALSE, message = FALSE}
+bootstrap_distribution <- cats %>%
+  specify(Bwt~Sex) %>%
+  generate(reps = 1000) %>%
+  calculate(stat = "diff in means", order = c("F", "M"))
+  percentile_ci <- bootstrap_distribution %>%
+  get_ci()
+```
+  
+Using the percentile method, our range of plausible values for the difference in the mean body weight between
+female and male adult cats is -0.67 kilograms to -0.41 kilograms. That is to say that on average female adult
+cats' bodies weigh between 0.41 and 0.67 kilograms **less** than adult male cats' bodies. (Note: the fact that
+the individual CIs in part a. didn't overlap told us that zero wouldn't be in the interval for the difference in
+the population means)
+
+
+
+
+
+
+
+
+
