@@ -1,0 +1,98 @@
+library(ggplot2)
+library(dplyr)
+library(moderndive)
+library(skimr)
+library(tidyr)
+library(kableExtra)
+library(gridExtra)
+library(plotly)
+
+insurance <- read.csv("insurance.csv")
+
+data <- insurance %>%
+  filter(region == "southeast") 
+  
+insurance %>%
+  select(charges,age,bmi) %>%
+  cor()
+
+ggplot(insurance, aes(x = age, y=charges, color = smoker)) +
+  geom_point() 
+ggplot(insurance, aes(x = bmi, y=charges, color = smoker)) +
+  geom_point() 
+
+# model1 
+model1 <- lm(charges ~ age + bmi + age*smoker + bmi*smoker, data = data)
+summary(model1)
+plot_ly(data, x = ~age, y = ~bmi, z = ~charges, color= ~smoker,
+        type = "scatter3d", mode = "markers")
+
+# modelb 
+modelb <- lm(charges ~ age + bmi + bmi*smoker, data = data)
+summary(modelb)
+
+# modelc
+modelc <- lm(charges ~ age*smoker, data = data)
+summary(modelc)
+
+# modelc
+modelc <- lm(formula = charges ~ age + bmi + smoker + bmi:smoker, data = data)
+summary(modelc)
+
+# model2
+model2<-lm(charges~age+smoker,data=data)
+get_regression_table(model2)
+coeff  <- model2 %>% 
+  coef() %>%
+  as.numeric()
+
+slopes <- data %>%
+  group_by(smoker) %>%
+  summarise(min = min(age), max = max(age)) %>%
+  mutate(intercept = coeff[1]) %>%
+  mutate(intercept = ifelse(smoker == "yes", intercept + coeff[3], intercept)) %>%
+  gather(point, age, -c(smoker, intercept)) %>% #gathers columns into rows
+  #See Data Wrangling Cheat Sheet
+  mutate(y_hat = intercept + age * coeff[2])
+
+ggplot(data, aes(x = age, y = charges, col = smoker)) +
+  geom_jitter() +
+  labs(x = "Age", y = "Charges", color = "Smoker") +
+  geom_line(data = slopes, aes(y = y_hat), size = 1)
+
+# model3
+model3 <-lm(charges~ age * smoker, data = data)
+get_regression_table(model3)
+ggplot(data, aes(x = age, y = charges, color = smoker)) +
+  geom_point() +
+  labs(x = "Age", y = "Charges", color = "Smoker") +
+  geom_smooth(method = "lm", se = FALSE)
+
+# model4
+model4<-lm(charges~bmi+smoker,data=data)
+get_regression_table(model4)
+coeff  <- model4 %>% 
+  coef() %>%
+  as.numeric()
+
+slopes <- data %>%
+  group_by(smoker) %>%
+  summarise(min = min(bmi), max = max(bmi)) %>%
+  mutate(intercept = coeff[1]) %>%
+  mutate(intercept = ifelse(smoker == "yes", intercept + coeff[3], intercept)) %>%
+  gather(point, bmi, -c(smoker, intercept)) %>% #gathers columns into rows
+  #See Data Wrangling Cheat Sheet
+  mutate(y_hat = intercept + bmi * coeff[2])
+
+ggplot(data , aes(x = bmi, y = charges, col = smoker)) +
+  geom_jitter() +
+  labs(x = "Bmi", y = "Charges", color = "Smoker") +
+  geom_line(data = slopes, aes(y = y_hat), size = 1)
+
+# model5
+model5<-lm(charges~bmi*smoker,data=data)
+get_regression_table(model5)
+ggplot(data, aes(x = bmi, y = charges, color = smoker)) +
+  geom_point() +
+  labs(x = "Bmi", y = "Charges", color = "Smoker") +
+  geom_smooth(method = "lm", se = FALSE)
