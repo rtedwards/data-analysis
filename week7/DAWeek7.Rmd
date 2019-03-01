@@ -4,9 +4,13 @@ author: "Robert Edwards"
 date: "22 February 2019"
 output:
   pdf_document:
-          latex_engine: pdflatex
-          number_sections: yes
-fig_caption: yes
+    latex_engine: pdflatex
+    number_sections: yes
+    fig_caption: yes
+    keep_tex: yes
+header-includes: 
+  \usepackage{float}
+  \floatplacement{figure}{H}
 ---
 
 ```{r setup, echo = FALSE, eval = TRUE, warning = FALSE, message = FALSE}
@@ -323,15 +327,15 @@ bootstrap_distribution %>%
 You can see that 95% of the data stored in the `stat` variable in `bootstrap_distribution` falls between the two endpoints with 2.5% to the left outside of the shading and 2.5% to the right outside of the shading. The cut-off points that provide our range are shown with the darker lines.
 
 ##The Standard Error Method
-If the bootstrap distribution is close to symmetric and bell-shaped, we can also use a shortcut formula for determining the lower and upper endpoints of the confidence interval. This is done by using the formula $\bar{x}±(multiplier???SE)$, where $\bar{x}$ is our original sample mean and $SE$ stands for **standard error** and corresponds to the standard deviation of the bootstrap distribution.
+If the bootstrap distribution is close to symmetric and bell-shaped, we can also use a shortcut formula for determining the lower and upper endpoints of the confidence interval. This is done by using the formula $\bar{x}?(multiplier???SE)$, where $\bar{x}$ is our original sample mean and $SE$ stands for **standard error** and corresponds to the standard deviation of the bootstrap distribution.
 
-**Definition**: The *stnadard error* is the standard deviation of the sampling distribution. 
+**Definition**: The *standard error* is the standard deviation of the sampling distribution. 
 
 The variability of the sampling distribution may be approximated by the variability of the bootstrap distribution. Traditional theory-based methodologies for inference also have formulas for standard errors, assuming some conditions are met (you will have (seen some of these)[https://moodle.gla.ac.uk/pluginfile.php/1813455/mod_resource/content/1/Interval%20Estimates%20Summary.pdf] in Statistical Inference in Semester 1).
 
 The value of *multiplier* here is the appropriate percentile of the standard normal distribution. This is automatically calculated when `level` is provided with `level = 0.95` being the default. (95% of the values in a standard normal distribution fall within 1.96 standard deviations of the mean, so  `multiplier = 1.96` corresponds to `level = 0.95`, for example.) As mentioned, this formula assumes that the bootstrap distribution is symmetric and bell-shaped. This is often the case with bootstrap distributions, especially those in which the original distribution of the sample is not highly skewed.
 
-This $\bar{x}±(multiplier???SE)$ formula is implemented in the `get_ci()` function as shown with our pennies problem using the bootstrap distribution's variability as an approximation for the sampling distribution's variability. We'll see more on this approximation shortly.
+This $\bar{x}?(multiplier???SE)$ formula is implemented in the `get_ci()` function as shown with our pennies problem using the bootstrap distribution's variability as an approximation for the sampling distribution's variability. We'll see more on this approximation shortly.
 
 Note that the center of the confidence interval (the `point_estimate`) must be provided for the standard error confidence interval.
 
