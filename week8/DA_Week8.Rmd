@@ -1,0 +1,616 @@
+---
+title: "Data Analysis: Model Parameter Inference and Model Selection"
+output: learnr::tutorial
+fig_caption: yes
+runtime: shiny_prerendered
+---
+
+```{r setup, include=FALSE}
+library(learnr)
+library(ggplot2)
+library(dplyr)
+library(moderndive)
+library(ISLR)
+library(skimr)
+library(plotly)
+library(tidyr)
+library(datasets)
+library(knitr)
+library(janitor)
+library(infer)
+library(readr)
+library(broom)
+library(gridExtra)
+library(GGally) #Package to produce matrix of 'pairs' plots and more!
+
+knitr::opts_chunk$set(comment = NA, warning = FALSE, message = FALSE)
+```
+
+<style>
+p.caption {
+  font-size: 1.4em;
+}
+</style>
+
+
+## Introduction
+
+In last week's lab we began to consider the construction and use of confidence intervals (CIs) for the population parameters listed in Table 1 (reproduced below).  In particular, we used bootstrap methods to estimate the sampling distributions of the estimates in Scenarios 1-4 and used these to construct CIs for the corresponding population parameters.
+
+```{r inference-summary-table, echo=FALSE, message=FALSE, warning=FALSE}
+# Original at https://docs.google.com/spreadsheets/d/1QkOpnBGqOXGyJjwqx1T2O5G5D72wWGfWlPyufOgtkk4/edit#gid=0
+read_csv("data/ch9_summary_table - Sheet1.csv", na = "") %>% 
+  kable(
+    caption = "Table 1: Scenarios of sample statisitics for inference", 
+    booktabs = TRUE
+  )
+```
+
+In this week's lab we will continue this process for Scenarios 5 and 6, namely construct CIs for the parameters in simple and multiple linear regression models.  We will start with bootstrap methods and also consider CIs based on theoretical results when standard assumptions hold.  We will also consider how to use CIs for variable selection and finish by considering a model selection strategy based on objective measures for model comparisons.
+
+***
+Now that you are familiar with RMarkdown, you are encouraged to collate your work in this tutorial in a RMarkdown file.  For this reason, these tutorials no longer contain "code chunks" where you can run your own R code. Use a `.Rmd` file instead.
+
+Create a `.Rmd` file to load the following packages into R:
+
+```{r message=FALSE, warning=FALSE}
+library(dplyr)
+library(ggplot2)
+library(janitor)
+library(moderndive)
+library(infer)
+library(broom)
+```
+
+**Note**: Additional information and examples can be found in [Chapter 11](https://moderndive.com/11-inference-for-regression.html) of [An Introduction to Statistical and Data Science via R](https://moderndive.com/index.html).
+
+
+## Confidence Intervals for Regression Parameters
+
+### Bootstrap Confidence Intervals for $\beta$ in Simple Linear Regression (SLR)
+
+Just as we did for Scenarios 1-4 in Table 1 in Week 7, we can use the `infer` package to repeatedly sample from a dataset to estimate the sampling distribution and standard error of the estimates of the intercept ($\hat \alpha$) and the covariate's parameter ($\hat \beta$) in the simple linear regression model $\hat y_i = \hat \alpha + \hat \beta x_i$. These sampling distributions enable us to directly find bootstrap confidence intervals for the model parameters.  Usually, interest lies in $\beta$ and so that will be our focus here.
+
+To illustrate this, let's return to the teaching evaluations data that we analyzed last week and start with the SLR model with `age` as the the single explanatory variable and the instructors' evaluation `score`s as the outcome variable.  This data and the fitted model are shown here.
+
+```{r}
+slr.model <- lm(score~age, data=evals)
+coeff <- slr.model %>% coef() 
+coeff
+```
+<!-- evals_slr <- evals %>% -->
+<!--   select(score, age) -->
+
+```{r modelslr, warning=FALSE, fig.cap="Figure 1: SLR Model applied to Teaching Evaluation Data"}
+ggplot(evals, aes(x = age, y = score)) +
+  geom_jitter() +
+  labs(x = "Age", y = "Teaching Score") +
+  geom_smooth(method = "lm", se = FALSE)
+```
+
+The point estimate of the slope parameter here is $\hat \beta=$ `r round((slr.model %>% coef() %>% as.numeric)[2],3)`.  The following code estimates the sampling distribution of $\hat \beta$ via the bootstrap method. 
+
+```{r echo=FALSE}
+set.seed(201)
+```
+
+```{r}
+bootstrap_beta_distn <- evals %>% 
+  specify(score ~ age) %>%
+  generate(reps = 1000, type = "bootstrap") %>% 
+  calculate(stat = "slope")
+bootstrap_beta_distn %>% visualize()
+```
+
+Now we can use the `get_ci()` function to calculate a 95% confidence interval and a 99% confidence interval. We can do this either using the percentiles of the bootstrap distribution or using an estimate of the standard error from the bootstrap distribution. Remember that both these CIs denote a range of plausible values for the unknown true population slope parameter regressing teaching `score` on `age`.
+
+```{r}
+percentile_beta_ci <- bootstrap_beta_distn %>% 
+  get_ci(level = 0.95, type = "percentile")
+percentile_beta_ci
+
+se_beta_ci <- bootstrap_beta_distn %>% 
+  get_ci(level = 0.99, type = "se", point_estimate = coeff[2])
+se_beta_ci
+```
+
+Using the 2.5% and 97.5% percentiles of the simulated bootstrap sampling distribution the 95% confidence interval is (`r round(as.numeric(percentile_beta_ci)[1],3)`,`r round(as.numeric(percentile_beta_ci[2]),3)`).
+
+<!-- and 99% confidence interval using the standard deviation of the sampling distribution (i.e. estimated standard error of $\hat \beta$) is (`r round(as.numeric(se_beta_ci)[1],3)`,`r round(as.numeric(se_beta_ci[2]),3)`). With the bootstrap distribution being close to symmetric, it makes sense that the two resulting confidence intervals are similar. -->
+
+```{r quiz1, echo=FALSE}
+quiz(question("What is the 99% Confidence Interval for the age parameter by the standard effor approach?",
+    answer("(-0.012, -0.001)"),
+    answer("(-0.012, 0.001)", correct = TRUE, message = "The CI using the estimated standard error is (-0.013, 0.001) and the CI using the percentile approach is (-0.011, -0.001)"),
+    answer("(-0.011, 0.001)"),
+    answer("(-0.012, -0.001)"),
+    incorrect = "Incorrect: The CI using the estimated standard error is (-0.012, 0.001) and the CI using the percentile approach is (-0.011, -0.001)",
+    random_answer_order = TRUE
+),
+question("Comparing the two different confidence intervals (95% and 99%) produced by the `percentile` and the `se` methods, respectively, we conclude:",
+    answer("The two confidence intervals are similar since the bootstrap sampling distribution was close to symmetric", correct = TRUE, message = "When the bootstrap distribution is symmetric the two approaches yield very similar results"),
+    answer("The two confidence intervals are quite different despite the bootstrap sampling distribution being close to symmetric"),
+    answer("The two confidence intervals are similar despite the bootstrap sampling distribution being close to symmetric"),
+    answer("The two confidence intervals are quite different because the bootstrap sampling distribution was close to symmetric"),
+    incorrect = "Incorrect: When the bootstrap distribution is symmetric the two approaches yield very similar results",
+    random_answer_order = TRUE
+)
+)
+```
+
+### Confidence Intervals for the parameters in Multiple Regression
+
+Let's continue with the teaching evaluations data by fitting the multiple regression with one numerical and one categorical predictor that we first saw in Week 7. In this model:
+
+* $y$: outcome variable of instructor evaluation `score`
+* predictor variables
+    + $x_1$: numerical explanatory/predictor variable of `age`
+    + $x_2$: categorical explanatory/predictor variable of `gender`
+
+```{r}
+evals_multiple <- evals %>%
+  select(score, gender, age)
+```
+<!-- ethnicity, language, bty_avg, rank -->
+
+First, recall that we had two competing potential models to explain professors' teaching evaluation scores:
+
+1. Model 1: Parallel lines model (no interaction term) - both male and female professors have the same slope describing the associated effect of age on teaching score
+2. Model 2: Interaction model - allowing for male and female professors to have different slopes describing the associated effect of age on teaching score
+
+**Refresher: Visualizations**
+
+Recall the plots we made for both these models:
+
+```{r model1, echo=FALSE, warning=FALSE, fig.cap="Model 1: No interaction effect included"}
+coeff <- lm(score ~ age + gender, data = evals_multiple) %>% coef() %>% as.numeric()
+slopes <- evals_multiple %>%
+  group_by(gender) %>%
+  summarise(min = min(age), max = max(age)) %>%
+  mutate(intercept = coeff[1]) %>%
+  mutate(intercept = ifelse(gender == "male", intercept + coeff[3], intercept)) %>%
+  gather(point, age, -c(gender, intercept)) %>%
+  mutate(y_hat = intercept + age * coeff[2])
+  
+  ggplot(evals_multiple, aes(x = age, y = score, col = gender)) +
+  geom_jitter() +
+  labs(x = "Age", y = "Teaching Score", color = "Gender") +
+  geom_line(data = slopes, aes(y = y_hat), size = 1)
+```
+
+```{r model2, echo=FALSE, warning=FALSE, fig.cap="Model 2: Interaction effect included"}
+ggplot(evals_multiple, aes(x = age, y = score, col = gender)) +
+  geom_jitter() +
+  labs(x = "Age", y = "Teaching Score", color = "Gender") +
+  geom_smooth(method = "lm", se = FALSE)
+```
+
+**Refresher: Regression tables**
+
+Let's also recall the regression models we fit. First, the regression with no 
+interaction effect: note the use of `+` in the formula.
+
+<!-- ```{r, eval=FALSE} -->
+<!-- par.model <- lm(score ~ age + gender, data = evals_multiple) -->
+<!-- get_regression_table(par.model) -->
+<!-- ``` -->
+```{r}
+par.model <- lm(score ~ age + gender, data = evals_multiple)
+get_regression_table(par.model) %>% 
+  knitr::kable(
+    digits = 3,
+    caption = "Model 1: Regression table with no interaction effect included", 
+    booktabs = TRUE
+  )
+```
+
+Second, the regression with an interaction effect: note the use of `*` in the formula.
+
+<!-- ```{r, eval=FALSE} -->
+<!-- int.model <- lm(score ~ age * gender, data = evals_multiple) -->
+<!-- get_regression_table(int.model) -->
+<!-- ``` -->
+```{r}
+int.model <- lm(score ~ age * gender, data = evals_multiple)
+get_regression_table(int.model) %>% 
+  knitr::kable(
+    digits = 3,
+    caption = "Model 2: Regression table with interaction effect included", 
+    booktabs = TRUE
+  )
+```
+
+Notice that, together with the estimated parameter values, the tables include other information about each estimated parameter in the model, namely:
+
+* **std_error**: the standard error of each parameter estimate
+* **statistic**: the test statistic value used to test the null hypothesis that the population parameter is zero
+* **p_value**: the $p$ value associated with the test statistic under the null hypothesis
+* **lower_ci** and **upper_ci**: the lower and upper bounds of the 95% confidence interval for the population parameter
+
+These values are calculated using the theoretical results based on the standard assumptions that you will have seen in *Regression Modelling* in first semester.  Theses values are **not** based on bootstrapping techniques since these become much harder to implement when working with multiple variables and its beyond the scope of this course.
+
+<!-- quiz(question("What is the 95% Confidence Interval for the difference, on average, between the evaluation scores of male and female professors when age is taken into account, based on the the parallel lines model?", -->
+<!--    answer("(0.1, 0.3)", correct = TRUE, message = "The average difference between the evaluation scores of male and female professors when age is taken into account is estimated by the `gendermale` term in the parallel lines model"), -->
+<!--     answer("(0.1, -0.001)"), -->
+<!--     answer("(-0.011, 0.001)"), -->
+<!--     answer("(-0.012, -0.001)"), -->
+<!--     incorrect = "Incorrect: The CI using the estimated standard error is (-0.012, 0.001) and the CI using the percentile approach is (-0.011, -0.001)", -->
+<!--     random_answer_order = TRUE -->
+<!-- ), -->
+
+```{r quiz2, echo=FALSE}
+quiz(question("What is the 95% Confidence Interval for the difference, on average, between the (linear) effect age has on the evaluation scores of male professors and the (linear) effect age has on the evaluation scores of female professors?",
+answer("(0.003, 0.024)", correct = TRUE, message = "The difference (males - females) between the slopes of the age variable is estimated by the `age:gendermale` term in the interaction model. So the linear rate of change in the male evaluation scores is likely to be between (0.003, 0.024) higher than the linear rater of change in the female evaluation scores"),
+    answer("(-0.968, 0.076)"),
+    answer("(0.087, 0.294)"),
+    answer("(-0.026,	-0.009)"),
+    incorrect = "The difference (males - females) between the slopes of the age variable is estimated by the `age:gendermale` term in the interaction model. So the linear rate of change in the male evaluation scores is likely to be between (0.003, 0.024) higher than the linear rater of change in the female evaluation scores",
+    random_answer_order = TRUE
+),
+question("By just considering the simpler parallel lines model, what can we say about the the difference, on average, between the evaluation scores of male and female professors when age is taken into account?",
+   answer("Its highly likely that, on average, male professors' scores are between 0.1 and 0.3 units higher than females professors' scores when age is taken into account", correct = TRUE, message = "The average difference between the evaluation scores of male and female professors (male - female) when age is taken into account is estimated by the `gendermale` term in the parallel lines model"),
+    answer("Its highly likely that, on average, male professors' scores are between 0.1 and 0.3 units lower than females professors' scores when age is taken into account"),
+    answer("Its highly likely that, on average, male professors' scores are between 0.003 and 0.014	units higher than females professors' scores when age is taken into account"),
+    answer("Its highly likely that, on average, male professors' scores are between 0.003 and 0.014	units lower than females professors' scores when age is taken into account"),
+    incorrect = "Incorrect: The average difference between the evaluation scores of male and female professors (male - female) when age is taken into account is estimated by the `gendermale` term in the parallel lines model",
+    random_answer_order = TRUE
+)
+)
+```
+
+
+
+## Inference using Confidence Intervals 
+
+Having described several ways of calculating confidence intervals for model parameters, we are now in a position to interpret them for the purposes of statistical inference.
+
+**Simple Linear Regression:  $\hat y_i = \alpha + \beta x_i$**
+
+Whether we have obtained a confidence interval for $\beta$  in a simple linear regression model via bootstrapping or theoretical results based on assumptions, the interpretation of the interval is the same.  As we saw in Week 7, 
+
+> A confidence interval gives a range of plausible values for a population parameter.
+
+We can therefore use the confidence interval for $\beta$ to state a range of plausible values and, just as usefully, what values are **not** plausible.  The most common values to compare the confidence interval of $\beta$ with is 0 (zero), since $\beta = 0$ says there is *no* (linear) relationship between the outcome variable ($y$) and the explanatory variable ($x$).  Therefore, if 0 lies within the confidence interval for $\beta$ then there is insufficient evidence of a linear relationship between $y$ and $x$.  However, if 0 does **not** lie within the confidence interval, then we conclude that $\beta$ is significantly different from zero and therefore that there is evidence of a linear relationship between $y$ and $x$.
+
+
+Let's use the confidence interval based on theoretical results for slope parameter in the SLR model applied to the teacher evaluation scores with `age` as the the single explanatory variable and the instructors' evaluation `score`s as the outcome variable. 
+
+
+<!-- ```{r, eval=FALSE} -->
+<!-- get_regression_table(slr.model) -->
+<!-- ``` -->
+```{r}
+get_regression_table(slr.model) %>% 
+  knitr::kable(
+    digits = 3,
+    caption = "Estimate summaries from the SLR Model of `score` on `age`.", 
+    booktabs = TRUE
+  )
+```
+
+```{r quiz3, echo=FALSE}
+quiz(question("Based on the fitted SLR model, is there evidence that there is a statistically significant linear realationship between the age of the professors and their teaching evaluation score?",
+answer("Yes", correct = TRUE, message = "The 95% CI for the slope parameter is from -0.011 to -0.001 which tecnically doesn't contain zero, hence we could conclude there is a linear relationship and that for every year the professors age the average evaluation score decreases between 0.001 and 0.011 units.  However, clearly the lower bound is so close to zero that we would caution that this inference is in fact inconclusive."),
+    answer("No"),
+#    answer("Inconclusive"),
+    incorrect = "The 95% CI for the slope parameter is from -0.011 to -0.001 which tecnically doesn't contain zero, hence we could conclude there is a linear relationship and that for every year the professors age the average evaluation score decreases between 0.001 and 0.011 units.  However, clearly the lower bound is so close to zero that we would caution that this inference is in fact inconclusive.",
+    random_answer_order = FALSE
+))
+```
+
+
+**Multiple Regression**
+
+Consider, again, the fitted interaction model for `score` with `age` and `gender` as the two explanatory variables.
+
+```{r, eval=FALSE}
+int.model <- lm(score ~ age * gender, data = evals_multiple)
+get_regression_table(int.model)
+```
+
+```{r, echo=FALSE}
+int.model <- lm(score ~ age * gender, data = evals)
+get_regression_table(int.model) %>% 
+  knitr::kable(
+    digits = 3,
+    caption = "Model 2: Regression table with interaction effect included", 
+    booktabs = TRUE
+  )
+```
+
+
+```{r quiz4, echo=FALSE}
+quiz(question("Based on the fitted interaction model, is there evidence that we should allow for different rates of change for male and female professors' teaching scores as they get older?",
+answer("Yes", correct = TRUE, message = "The 95% CI for the interaction term `age:gendermale` is from 0.003 to 0.024 which doesn't contains zero and therefore there is evidence of a statistically significant difference in the rate of change of the evaluation scores between male and female professors as they age.  Note that this is a subjective conclusion, since the lower bound is close to zero and therefore could be interpretted as 'inconclusive'."),
+    answer("No"),
+    answer("Inconclusive"),
+    incorrect = "The 95% CI for the interaction term `age:gendermale` is from 0.003 to 0.024 which doesn't contains zero and therefore there is evidence of a statistically significant difference in the rate of change of the evaluation scores between male and female professors as they age.  Note that this is a subjective conclusion, since the lower bound is close to zero and therefore could be interpretted as 'inconclusive'.",
+    random_answer_order = FALSE
+))
+```
+
+
+
+## Variable selection using confidence intervals 
+
+When there is more than one explanatory variable in a model, the parameter associated with each explanatory variable is interpreted as the change in the mean response based on a 1-unit change in the corresponding explanatory variable **keeping all other variables held constant**.  Therefore, care must be taken when interpreting the confidence intervals of each parameter by acknowledging that each are plausible values **conditional on all the other explanatory variables in the model**.
+
+Because of the interdependence between the parameter estimates and the variables included in the model, choosing which variables to include in the model is a rather complex task.  We will introduce some of the ideas in the simple case where we have 2 potential explanatory variables ($x_1$ and $x_2$)  and use confidence intervals to decide which variables will be useful in predicting the outcome variable ($y$).
+
+One approach is to consider a hierarchy of models:
+
+$$\hat y_i = \alpha + \beta_1 x_{1i} + \beta_2 x_{2i}$$   
+$$\hat y_i = \alpha + \beta_1 x_{1i} \qquad \qquad \qquad \hat y_i = \alpha + \beta_2 x_{2i}$$   
+$$\hat y_i = \alpha$$
+
+Within this structure we might take a top-down approach:
+
+1. Fit the most general model, i.e. $\hat y_i = \alpha + \beta_1 x_{1i} + \beta_2 x_{2i}$ since we believe this is likely to provide a good description of the data.
+2. Construct confidence intervals for $\beta_1$ and $\beta_2$
+    (a) If both intervals exclude 0 then retain the model with both $x_1$ and $x_2$.
+    (b) If the interval for $\beta_1$ contains 0 but that for $\beta_2$ does not, fit the model with $x_2$ alone.
+    (c) If the interval for $\beta_2$ contains 0 but that for $\beta_1$ does not, fit the model with $x_1$ alone.
+    (d) If both intervals include 0 it may still be that a model with one variable is useful. In this case the two models with the single variables should be fitted and intervals for $\beta_1$ and $\beta_2$ constructed and compared with 0.
+
+If we have only a few explanatory variables, then an extension of the strategy outlined above would be effective, i.e. start with the full model and simplify by removing terms until no further terms can be removed.  When the number of explanatory variables is large the problem becomes more difficult. We will consider this more challenging situation in the next section.
+
+Recall that as well as `age` and `gender`, there is also a potential explanatory variable `bty_avg` in the `evals` data, i.e. the numerical variable of the average beauty score from a panel of six students' scores between 1 and 10. We can fit the multiple regression model with the two continuous explanatory variables `age` and `bty_avg` as follows:
+
+```{r, eval=FALSE}
+mlr.model <- lm(score ~ age + bty_avg, data = evals)
+```
+
+```{r, echo=FALSE}
+mlr.model <- lm(score ~ age + bty_avg, data = evals)
+get_regression_table(mlr.model) %>% 
+  knitr::kable(
+    digits = 3,
+    caption = "Esimate summaries from the MLR model with `age` and `bty_avg`", 
+    booktabs = TRUE
+  )
+```
+
+
+```{r quiz5, echo=FALSE}
+quiz(question("Following the process outlined above for choosing which variables to include in the model, what would be your next step after fitting this MLR model?",
+answer("Fit a SLR model with `bty_avg`", correct = TRUE, message = "None of the 95% CIs for the parameters in the model contain zero **except** that for age `(-0.008, 0.002)`, therefore we conclude that `age` does not contribute significantly to the model alongside `bty_avg` and thus remove it from the model and refit the model with just `bty_avg`.  Note that this is a subjective conclusion, since the upper bound is close to zero and therefore could be interpretted as 'inconclusive'."),
+    answer("Fit a SLR model with `age`"),
+    answer("Keep the MLR model with both `age` and `bty_avg`"),
+    answer("Drop both `age` and `bty_avg` from the model"),
+    incorrect = "None of the 95% CIs for the parameters in the model contain zero **except** that for age `(-0.008, 0.002)`, therefore we conclude that `age` does not contribute significantly to the model alongside `bty_avg` and thus remove it from the model and refit the model with just `bty_avg`.  Note that this is a subjective conclusion, since the upper bound is close to zero and therefore could be interpretted as 'inconclusive'.",
+    random_answer_order = TRUE
+))
+```
+
+
+
+<!-- ```{r} -->
+<!-- slr.model <- lm(score ~ bty_avg, data = evals) -->
+<!-- get_regression_table(slr.model) %>%  -->
+<!--   knitr::kable( -->
+<!--     digits = 3, -->
+<!--     caption = "Model 1: Regression table with no interaction effect included",  -->
+<!--     booktabs = TRUE -->
+<!--   ) -->
+<!-- ``` -->
+
+
+
+## Model comparisons using objective criteria 
+
+As was noted in the last section, when the number of potential predictor variables is large the problem of selecting which variables to include in the final model becomes more difficult.  The selection of a final regression model always involves a compromise:
+
+* Predictive accuracy (improved by including more predictors)
+* Parsimony and interpretability (achieved by having less predictors)
+
+
+There are many objective criteria for comparing different models applied to the same data set. All of them trade off the two objectives above, i.e.  fit to the data against complexity. Common examples include:
+
+1.  The $R^2_{adj}$ values, i.e. the proportions of total variation of response variable explained by the models.
+
+$$R_{adj}^2 = 1 - \frac{RSS/(n-p-1)}{SST/(n-1)} = 100 \times \Bigg[ 1-\frac{\sum_{i=1}^n(y_i-\hat y_i)^2/(n-p-1)}{\sum_{i=1}^n(y_i-\bar y_i)^2/(n-1)}\Bigg]$$
+
+  * where 
+      * $n$ is the sample size
+      * $p$ is the number of parameters in the model
+      * $RSS$ is the residual sum of squares from the fitted model
+      * $SST$ is the total sum of squares around the mean response.
+  * F ratios and the F-distribution can used to compare the $R_{adj}^2$ values
+  * These can only be used for nested models, i.e. where one model is a particular case of the other
+
+2. Akaike's Information Criteria (AIC) 
+
+$$AIC = -2(\mbox{log-likeihood})+2p = n\mbox{ln}\Bigg(\frac{RSS}{n}\Bigg)+2p$$
+
+  * A value based on the maximum likelihood function of the parameters in the fitted model penalized by the number of parameters in the model
+  * Can be used to compare any models fitted to the same response variable 
+  * The smaller the AIC the 'better' the model, i.e. no distributional results are employed to assess differences 
+
+
+3. Bayesian Information Criteria 
+
+$$BIC = -2(\mbox{log-likeihood})+\mbox{ln}(n)p$$
+
+
+A popular data analysis strategy which we shall adopt is to calculate $R_{adj}^2$, $AIC$ and $BIC$ and prefer the models which **minimize** $AIC$ and $BIC$ and that **maximize** $R_{adj}^2$.
+
+
+To illustrate, let's return to the `evals` data and the MLR on the teaching evaluation score `score` with the two continuous explanatory variables `age` and `bty_avg` and compare this with the SLR model with just `bty_avg`.  To access these measures for model comparisons we can use the `glance()` function in the `broom` package (not to be confused with the `glimpse()` function in the `dplyr` package).
+
+```{r}
+library(broom)
+model.comp.values.slr.age <- glance(lm(score ~ age, data = evals))
+model.comp.values.slr.age
+model.comp.values.slr.bty_avg <- glance(lm(score ~ bty_avg, data = evals))
+model.comp.values.slr.bty_avg
+model.comp.values.mlr <- glance(lm(score ~ age + bty_avg, data = evals))
+model.comp.values.mlr
+```
+
+Note that $R_{adj}^2$, $AIC$ and $BIC$ are contained in columns 3, 9 and 10 respectively.  To access just these values and combine them in a single table we use:
+
+```{r}
+Models <- c('SLR(age)','SLR(bty_avg)','MLR') 
+bind_rows(model.comp.values.slr.age, model.comp.values.slr.bty_avg, 
+          model.comp.values.mlr,.id="Model") %>%
+  select(Model,adj.r.squared,AIC,BIC) %>%
+  mutate(Model=Models) %>%  
+  kable(
+     digits = 2,
+     caption = "Model comparison values for different models" 
+  )
+```
+
+
+```{r quiz6, echo=FALSE}
+quiz(question("Based on these values and the model comparison strategy outlined above, which of these three models would you favour?",
+    answer("The SLR model with `age`"),
+    answer("The SLR model with `bty_avg`", correct = TRUE, message = sprintf("The SLR model with `bty_avg` has the highest $R^2_{adj}$ value and the lowest $AIC$ & $BIC$ values.  We note, however, the very low $R^2_{adj}$ values which suggest that none of these models is a good fit to the data.")),
+    answer("The MLR model with both `age` and `bty_avg`"),
+    answer("Inconclusive"),
+    incorrect = sprintf("The SLR model with `bty_avg` has the highest $R^2_{adj}$ value and the lowest AIC & BIC values.  We note, however, the very low $R^2_{adj}$ values which suggest that none of these models is a good fit to the data."),
+    random_answer_order = FALSE
+))
+#https://rstudio.github.io/learnr/questions.html  for use of sprintf()
+```
+
+
+
+ 
+
+## A final word on model selection
+
+A great deal of care should be taken in selecting predictors for a model because the values of the regression coefficients depend upon the variables in the model. Therefore, the predictors included and the order in which they are entered into the model can have a great impact. In an ideal world, predictors should be selected based on past research and new predictors should be added to existing models based on the theoretical importance of the variables.  One thing not to do is select hundreds of random predictors, bung them all into a regression analysis and hope for the best. 
+
+But in practice there are automatic strategies, such as *Stepwise* and *Best Subsets* regression, based on systematically searching through the entire list of variables not in the current model to make decisions on whether each should be included. These strategies need to be handled with care, and a proper discussion of them is beyond this course. Our best strategy is a mixture of judgement on what variables should be included as potential explanatory variables, together with parameter interval estimation and a comparison of objective measures for assessing different models. The judgements should be made in the light of advice from the problem context.
+
+***
+
+
+<!-- There are many methods for comparing models, including: -->
+
+<!-- - Simplicity - Simple statistical models are preferable to more -->
+<!-- complex ones, so choose the simplest model that appears to fit the data adequately. -->
+<!-- - Objective criteria - Overall measures of model fit (see next -->
+<!-- slide) are available which quantify which model fits the data -->
+<!-- best. -->
+<!-- - Statistical testing - If two models differ by one covariate, -->
+<!-- simply check if the additional covariate is signifcant or not. -->
+<!-- - Residual diagnostics - Which model appears to ft the data -->
+<!-- best. -->
+<!-- - Knowledge of the problem - If you think a variable should -->
+<!-- be included in model because it is important for explaining the -->
+<!-- response, then include it. -->
+
+**Golden rule for modelling**
+
+> The key to modelling data is to only use the objective measures as
+a rough guide. In the end the choice of model will involve your
+own judgement. You have to be able to defend why you chose a
+particular model.
+
+## Further Tasks
+
+You are encouraged to complete the following tasks by using RMarkdown to produce a single document which summarises all your work, i.e. the original questions, your R code, your comments and reflections, etc.
+
+1. Data was collected on the characteristics of homes in the American city of Los Angeles (LA) in 2010 and can be found in the file `LAhomes.csv` on the Moodle page.  The data contain the following variables:
+
+* `city` - the district of LA where the house was located
+* `type` - either `SFR` (Single Family Residences) or `Condo/Twh` (Condominium/Town House)
+* `bed` - the number of bedrooms
+* `bath` - the number of bathrooms
+* `garage` - the number of car spaces in the garage
+* `sqft` - the floor area of the house (in square feet)
+* `pool` - `Y` if the house has a pool
+* `spa` - `TRUE` if the house has a spa
+* `price` - the most recent sales price ($US)
+
+  We are interested in exploring the relationships betwen `price` and the other variables.
+
+  Read the data into an object called `LAhomes` and answer the following questions.
+
+```{r, echo=F, warning=FALSE, message=FALSE}
+LAhomes <- read_csv("LAhomes.csv")
+```
+
+a. By looking at the univariate and bivariate distributions on the `price` and `sqft` variables below, what would be a sensible way to proceed if we wanted to model this data?  What care must be taken if you were to proceed this way?
+
+```{r, message=FALSE, warning=FALSE}
+library(gridExtra) #Package to display plots side by side 
+                   #(like par(mfrow=c(2,2)) in base R)
+
+hist1 <- ggplot(LAhomes,aes(x=price))+
+  geom_histogram()
+
+hist2 <- ggplot(LAhomes,aes(x=sqft))+
+  geom_histogram()
+
+hist1log <- ggplot(LAhomes,aes(x=log(price)))+
+  geom_histogram()
+
+hist2log <- ggplot(LAhomes,aes(x=log(sqft)))+
+  geom_histogram()
+
+plot1 <- ggplot(LAhomes,aes(x=sqft,y=price))+
+  geom_point()
+
+plot2 <- ggplot(LAhomes,aes(x=log(sqft),y=log(price)))+
+  geom_point()
+
+grid.arrange(hist1, hist2, hist1log, hist2log, plot1, plot2, ncol=2, nrow=3)
+```
+
+b. Fit the simple linear model with `log(price)` as the response and `log(sqft)` as the predictor. Display the fitted model on a scatterplot of the data and construct a bootstrap confidence interval (using the percentiles of the bootstrap distribution) for the slope parameter in the model and interpret its point and interval estimates.
+
+    *Hint:* Although you can supply the `lm()` function with terms like `log(price)` when you use the `infer` package to generate bootstrap intervals you the transformed variable needs to already exist.  Use the `mutate()` funtion in the `dplyr` package to create new transformed variables.
+
+c. Repeat the analysis in part b. but with the log of the number of bathrooms (`bath`) as the single explanatory variable.
+
+
+d. Fit the multiple linear regression model using the **log transform of all the variables** `price` (as the response) and both `sqft` and `bath` (as the explanatory variables). Calculate the point and interval estimates of the coefficients of the two predictors separately. Compare their point and interval estimates to those you calculated in parts b. and c.   Can you account for the differences?
+
+    *Hint:* Remember that we didn't use bootstrapping to construct the confidence intervals for parameters in multiple linear regression models, but rather used the theoretical results based on assumptions.  You can access these estimates using the `get_regression_table()` function in the `moderndive` package.
+
+
+e. Using the objective measures for model comparisons, which of the models in parts b., c. and d. would you favour?  Is this consistent with your conclusions in part d.?
+
+***
+
+2.  You have been asked to determine the pricing of a New York City (NYC) Italian restaurant's dinner menu such that it is competitively positioned with other high-end Italian restaurants by analyzing pricing data that have been collected in order to produce a regression model to predict the price of dinner. 
+
+    Data from surveys of customers of 168 Italian restaurants in the target area are available. The data can be found in the file `restNYC.csv` on the Moodle page.  Each row represents one customer survey from Italian restaurants in NYC and includes the key variables:
+
+* `Price` - price (in $US) of dinner (including a tip and one drink)
+* `Food` - customer rating of the food (from 1 to 30)
+* `Decor` - customer rating fo the decor (from 1 to 30)
+* `Service` - customer rating of the service (from 1 to 30)
+* `East` - dummy variable with the value 1 if the restaurant is east of Fifth Avenue, 0 otherwise
+
+<!-- Develop a regression model that directly predicts the price of dinner (in dollars) -->
+<!-- using a subset or all of the four potential predictor variables listed above. -->
+
+```{r, echo=F, warning=FALSE, message=FALSE}
+restNYC <- read_csv("restNYC.csv")
+```
+
+a. Use the `ggpairs` function in the `GGally` package (see the following code) to generate an informative set of graphical and numberical summaries which illuminate the relationships bewteen pairs of variables.  Where do you see the strongest evidence of relationships between `price` and the potential explanatory variables?  Is there evidence of multicollineatity in the data?
+
+```{r, eval=FALSE}
+library(GGally) #Package to produce matrix of 'pairs' plots and more!
+restNYC$East <- as.factor(restNYC$East) # East needs to be a factor
+# Including the `East` factor
+ggpairs(restNYC[,4:8], aes(colour = East, alpha = 0.4)) 
+# Without the `East` factor
+ggpairs(restNYC[,4:7], aes(alpha = 0.4)) 
+```
+
+
+b. Fit the simple linear model with `Price` as the response and `Service` as the predictor and  display the fitted model on a scatterplot of the data.   Construct a bootstrap confidence interval (using the standard error from the bootstrap distribution) for the slope parameter in the model.
+
+    Now fit a multiple regressing model of `Price` on `Service`, `Food`, and `Decor`.  What happens to the significance of `Service` when additional variables were added to the model?
+
+
+c. What is the correct interpretation of the coefficient on `Service` in the linear model which regresses `Price` on `Service`, `Food`, and `Decor`?
+
+
+

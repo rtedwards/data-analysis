@@ -3,14 +3,14 @@ title: "Model Parameter Inference & Model Selection"
 author: "Robert Edwards"
 date: "2/28/2019"
 output:
+  html_document:
+    df_print: paged
   pdf_document:
-    latex_engine: pdflatex
-    number_sections: yes
     fig_caption: yes
     keep_tex: yes
-header-includes: 
-  \usepackage{float}
-  \floatplacement{figure}{H}
+    latex_engine: pdflatex
+    number_sections: yes
+header-includes: \usepackage{float} \floatplacement{figure}{H}
 ---
 
 ```{r setup, echo = FALSE, eval = TRUE, warning = FALSE, message = FALSE}
@@ -43,16 +43,16 @@ Scenario	Population parameter	                Population Notation	   Point estim
 6	        Population regression slope	          $\beta_1$	             Sample regression slope	          $\hat{\beta}_1~or~b_1$
 --------- ------------------------------------- ---------------------  ---------------------------------  ----------------------
 
-In this week’s lab we will continue this process for Scenarios 5 and 6, namely construct CIs for the parameters in simple and multiple linear regression models. We will start with bootstrap methods and also consider CIs based on theoretical results when standard assumptions hold. We will also consider how to use CIs for variable selection and finish by considering a model selection strategy based on objective measures for model comparisons.
+In this week's lab we will continue this process for Scenarios 5 and 6, namely construct CIs for the parameters in simple and multiple linear regression models. We will start with bootstrap methods and also consider CIs based on theoretical results when standard assumptions hold. We will also consider how to use CIs for variable selection and finish by considering a model selection strategy based on objective measures for model comparisons.
   
 
 \newpage
 #Confidence Intervals for Regression Parameters {#sec:regression}
 ##Bootstrap Confidence Intervals for $\beta$ in Simple Linear Regression (SLR)
 
-Just as we did for Scenarios 1-4 in Table 1 in Week 7, we can use the `infer` package to repeatedly sample from a dataset to estimate the sampling distribution and standard error of the estimates of the intercept ($\hat{\alpha}$) and the covariate’s parameter ($\hat{\beta}$) in the simple linear regression model $\hat{y} = \hat{\alpha} + \hat{\beta}x_i$. These sampling distributions enable us to directly find bootstrap confidence intervals for the model parameters. Usually, interest lies in $\beta$ and so that will be our focus here.
+Just as we did for Scenarios 1-4 in Table 1 in Week 7, we can use the `infer` package to repeatedly sample from a dataset to estimate the sampling distribution and standard error of the estimates of the intercept ($\hat{\alpha}$) and the covariate's parameter ($\hat{\beta}$) in the simple linear regression model $\hat{y} = \hat{\alpha} + \hat{\beta}x_i$. These sampling distributions enable us to directly find bootstrap confidence intervals for the model parameters. Usually, interest lies in $\beta$ and so that will be our focus here.
 
-To illustrate this, let’s return to the teaching evaluations data that we analyzed last week and start with the SLR model with `age` as the the single explanatory variable and the instructors’ evaluation `score`s as the outcome variable. This data and the fitted model are shown here.  
+To illustrate this, let's return to the teaching evaluations data that we analyzed last week and start with the SLR model with `age` as the the single explanatory variable and the instructors' evaluation `score`s as the outcome variable. This data and the fitted model are shown here.  
   
   
 ```{r slr.model, echo = TRUE, eval = TRUE, warning = FALSE, message = FALSE, fig.cap = "\\label{fig.plot1}SLR Model applied to Teaching Evaluation Data"}
@@ -127,7 +127,7 @@ First, recall that we had two competing potential models to explain professors' 
   
 **Refresher: Visualizations**  
 
-Recall the plots we made for both theparallel slopes and different slopes models:  
+Recall the plots we made for both the parallel slopes and different slopes models:  
  
 ```{r plot1, echo = FALSE, eval = TRUE, out.width = '85%', fig.pos="H", fig.align = "center", warning = FALSE, fig.cap = "\\label{fig:plot1}Model 1: No interaction effect included"}
 
@@ -156,7 +156,6 @@ ggplot(eval.score, aes(x = age, y = score, color = gender)) +
       y = "Teaching Score",
       color = "Gender") +
   geom_line(data = slopes, aes(y = y_hat), size = 1)
-
 ```
   
 ```{r plot2, echo = FALSE, eval = TRUE, out.width = '85%', fig.align = "center", warning = FALSE, fig.cap = "\\label{fig:plot2}Model2: Interaction effect included"}
@@ -172,7 +171,7 @@ ggplot(eval.score, aes(x = age, y = score, color = gender)) +
 \newpage  
 **Refresher: Regression Tables**  
 
-Let’s also recall the regression models we fit. First, the regression with no interaction effect: note the use of + in the formula.  
+Let's also recall the regression models we fit. First, the regression with no interaction effect: note the use of + in the formula.  
 
 ```{r echo = FALSE, eval = FALSE, warning = FALSE, message = FALSE}
 par.model <- lm(score ~ age + gender, data = evals_multiple)
@@ -234,7 +233,7 @@ Whether we have obtained a confidence interval for $\beta$ in a simple linear re
 
 We can therefore use the confidence interval for $\beta$ to state a range of plausible values and, just as usefully, what values are **not** plausible. The most common values to compare the confidence interval of $\beta$ with is 0 (zero), since $\beta = 0$ says there is no (linear) relationship between the outcome variable ($y$) and the explanatory variable ($x$). Therefore, if 0 lies within the confidence interval for $\beta$ then there is insufficient evidence of a linear relationship between $y$ and $x$. However, if 0 does **not** lie within the confidence interval, then we conclude that $\beta$ is significantly different from zero and therefore that there is evidence of a linear relationship between $y$ and $x$.
 
-Let’s use the confidence interval based on theoretical results for slope parameter in the SLR model applied to the teacher evaluation `score`s with `age` as the the single explanatory variable and the instructors’ evaluation scores as the outcome variable.  
+Let's use the confidence interval based on theoretical results for slope parameter in the SLR model applied to the teacher evaluation `score`s with `age` as the the single explanatory variable and the instructors' evaluation scores as the outcome variable.  
 
 ```{r table4, echo = FALSE, eval = TRUE, warning = FALSE, message = FALSE}
 get_regression_table(slr.model) %>% 
@@ -293,7 +292,7 @@ Within this structure we might take a top-down approach:
 
 If we have only a few explanatory variables, then start with the full model and simplify by removing terms until no further terms can be removed. When the number of explanatory variables is large the problem becomes more difficult. We consider this is Section \ref{sec:comparisons}
 
-Recall that as well as `age` and `gender`, there is also a potential explanatory variable `bty_avg` in the `evals` data, i.e. the numerical variable of the average beauty score from a panel of six students’ scores between 1 and 10. We can fit the multiple regression model with the two continuous explanatory variables `age` and `bty_avg` as follows:  
+Recall that as well as `age` and `gender`, there is also a potential explanatory variable `bty_avg` in the `evals` data, i.e. the numerical variable of the average beauty score from a panel of six students' scores between 1 and 10. We can fit the multiple regression model with the two continuous explanatory variables `age` and `bty_avg` as follows:  
   
 ```{r echo = TRUE, eval = FALSE, warning = FALSE, message = FALSE}
 mlr.model <- lm(score ~ age * bty_avg, data = evals)
@@ -331,7 +330,7 @@ $$R^2_{adj} = 1 - \frac{RSS/(n-p-1)}{SST/(n-1)} = 100 \times \Bigg[ 1 - \frac{ \
         + $p$ is the number of parameters in the model
         + $RSS$ is the residual sum of squares from the fitted model
         + $SST$ is the total sum of squares around the mean response
-    + F ratios and the F-distribution can be used to compare the $R^2_{adj} values
+    + F ratios and the F-distribution can be used to compare the $R^2_{adj}$ values
     + These can only be used for nested models, i.e. where one model is a particular case of the other
 
 2. Akaike's Information Criteria (AIC)
@@ -345,7 +344,7 @@ $$BIC = -2(log-likelihood) + ln(n)p$$
 
 A popular analysis strategy which we shall adopt is to calculate $R^2_{adj}$, AIC, and BIC and prefer the models which *minimize* AIC and BIC and that **maximize** $R^2_{adj}$.
 
-To illustrate, let’s return to the `evals` data and the MLR on the teaching evaluation score `score` with the two continuous explanatory variables `age` and `bty_avg` and compare this with the SLR model with just `bty_avg`. To access these measures for model comparisons we can use the `glance()` function in the broom package (not to be confused with the `glimpse()` function in the `dplyr` package).
+To illustrate, let's return to the `evals` data and the MLR on the teaching evaluation score `score` with the two continuous explanatory variables `age` and `bty_avg` and compare this with the SLR model with just `bty_avg`. To access these measures for model comparisons we can use the `glance()` function in the broom package (not to be confused with the `glimpse()` function in the `dplyr` package).
 
 ```{r echo = TRUE, eval = TRUE, warning = FALSE, message = FALSE}
 library(broom)
@@ -395,12 +394,138 @@ But in practice there are automatic strategies, such as Stepwise and Best Subset
 \newpage
 #Further Tasks {#sec:Further}
 
+Data was collected on the characteristics of homes in Los Angeles (LA) in 2010.  The data contain the following variables:
+
++ `city` - the district of LA where the house was located
++ `type` - either SFR (Single Family Residences) or  Condo/Twh (Condominium/Town House)
++ `bed` - the number of bedrooms
++ `bath` - the number of bathrooms
++ `garage` - the number of car spaces in the garage
++ `sqft` - the floor area of the house (in square feet)
++ `pool` - Y if the house has a pool
++ `spa` - TRUE if the house has a spa
++ `price` - the most recent sales price (US)  
   
+We are interested in exploring the relationships betwen `price` and the other variables.
 
+Read the data into an object called `LAhomes` and answer the following questions.
 
+a.  By looking at the univariate and bivariate distributions on the `price` and `sqft` variables below, what would be a sensible way to proceed if we wanted to model this data? What care must be taken if you were to proceed this way?  
+  
+```{r echo = FALSE, eval = TRUE, warning = FALSE, message = FALSE}
+library(gridExtra) #Package to display plots side by side 
+                   #(like par(mfrow=c(2,2)) in base R)
 
+LAhomes <- read.csv("LAhomes.csv", header = TRUE)
 
+hist1 <- ggplot(LAhomes,aes(x=price))+
+  geom_histogram()
 
+hist2 <- ggplot(LAhomes,aes(x=sqft))+
+  geom_histogram()
+
+hist1log <- ggplot(LAhomes,aes(x=log(price)))+
+  geom_histogram()
+
+hist2log <- ggplot(LAhomes,aes(x=log(sqft)))+
+  geom_histogram()
+
+plot1 <- ggplot(LAhomes,aes(x=sqft,y=price))+
+  geom_point()
+
+plot2 <- ggplot(LAhomes,aes(x=log(sqft),y=log(price)))+
+  geom_point()
+
+grid.arrange(hist1, hist2, hist1log, hist2log, plot1, plot2, ncol=2, nrow=3)
+```
+
+    + *Model the data with count regressing on the `log(price)` and `log(sqft)` including an interaction term `log(price)log(sqft)` because the two covariates are correlated.*  
+  
+b. Fit the simple linear model with `log(price)` as the response and `log(sqft)` as the predictor. Display the fitted model on a scatterplot of the data and construct a bootstrap confidence interval (using the percentiles of the bootstrap distribution) for the slope parameter in the model and interpret its point and interval estimates.
+
+Hint: Although you can supply the `lm()` function with terms like `log(price)` when you use the `infer` package to generate bootstrap intervals you the transformed variable needs to already exist. Use the `mutate()` funtion in the `dplyr` package to create new transformed variables.
+  
+```{r plot3, echo = FALSE, eval = TRUE, out.width = '85%', fig.pos="H", fig.align = "center", warning = FALSE, fig.cap = "\\label{fig:plot3}Model of LA home prices by sqft with interaction inluded"}
+
+LA.price <- LAhomes %>%
+  select(price, sqft)
+
+int.model <- lm(log(price) ~ log(sqft), data = LA.price)
+
+coeff <- int.model %>%
+  coef() %>%
+  as.numeric()
+
+LA.price.log <- LA.price %>%
+  mutate(log_price = log(price)) %>%
+  mutate(log_sqft = log(sqft)) %>%
+  mutate(intercept = coeff[1]) %>%
+  mutate(y_hat = intercept + log(sqft) * coeff[2])
+  
+ggplot(LA.price.log, aes(x = log_sqft, y = log_price)) +
+  geom_jitter() +
+  labs(x = "log(sqft)", 
+      y = "log(price)") + 
+  geom_line(data = LA.price.log, aes(y = y_hat), size = 1, color="red")
+ 
+
+bootstrap_beta_distn <- LAhomes %>%
+  specify(price ~ sqft) %>%
+  generate(reps = 1000, type = "bootstrap") %>%
+  calculate(stat = "slope")
+
+#bootstrap_beta_distn %>% visualize()
+
+percentile_beta_ci <- bootstrap_beta_distn %>%
+  get_ci(level = 0.95, type = "percentile")
+#percentile_beta_ci
+```
+  
+    + *The bootstrap CI (using percentiles of the bootstrap distribution) for the slope parameter in the model is `r round(percentile_beta_ci, 2)`.  For every 1 unit increase in `sqft` the price of a home in LA increases between `r round(percentile_beta_ci[1], 2)` and `r round(percentile_beta_ci[2], 2)`.*  
+    
+c. **Repeat the analysis in part b. but with the log of the number of bathrooms (`bath`) as the single explanatory variable.**  
+
+```{r plot4, echo = FALSE, eval = TRUE, out.width = '85%', fig.pos="H", fig.align = "center", warning = FALSE, fig.cap = "\\label{fig:plot4}Model of LA home prices by bath with interaction inluded"}
+
+LA.price <- LAhomes %>%
+  select(price, bath)
+
+int.model <- lm(log(price) ~ log(bath), data = LA.price)
+
+coeff <- int.model %>%
+  coef() %>%
+  as.numeric()
+
+LA.price.log <- LA.price %>%
+  mutate(log_price = log(price)) %>%
+  mutate(log_bath = log(bath)) %>%
+  mutate(intercept = coeff[1]) %>%
+  mutate(y_hat = intercept + log(bath) * coeff[2])
+  
+ggplot(LA.price.log, aes(x = log_bath, y = log_price)) +
+  geom_jitter() +
+  labs(x = "log(bath)", 
+      y = "log(price)") + 
+  geom_line(data = LA.price.log, aes(y = y_hat), size = 1, color="blue")
+ 
+
+bootstrap_beta_distn <- LAhomes %>%
+  specify(price ~ bath) %>%
+  generate(reps = 1000, type = "bootstrap") %>%
+  calculate(stat = "slope")
+
+#bootstrap_beta_distn %>% visualize()
+
+percentile_beta_ci <- bootstrap_beta_distn %>%
+  get_ci(level = 0.95, type = "percentile")
+#percentile_beta_ci
+```
+
+    + *The bootstrap CI (using percentiles of the bootstrap distribution) for the slope parameter in the model is `r round(percentile_beta_ci, 2)`.  For every 1 unit increase in `bath` the price of a home in LA increases between `r round(percentile_beta_ci[1], 2)` and `r round(percentile_beta_ci[2], 2)`.*  
+    
+d.  **Fit the multiple linear regression model using the log transform of all the variables price (as the response) and both sqft and bath (as the explanatory variables). Calculate the point and interval estimates of the coefficients of the two predictors separately. Compare their point and interval estimates to those you calculated in parts b. and c. Can you account for the differences?
+
+Hint: Remember that we didn’t use bootstrapping to construct the confidence intervals for parameters in multiple linear regression models, but rather used the theoretical results based on assumptions. You can access these estimates using the  get_regression_table() function in the moderndive package.**  
 
 
 
