@@ -37,6 +37,7 @@ insur <- insurance %>%
   select(charges, age, bmi, smoker)
 ```
 
+
 # Introduction {#sec:Intro}
 
 Health insurance is an insurance that covers a varying portion of the medical expenses a person may incur.  Risk is spread across all persons covered by the insurer.  Insured individuals enroll in a health insurance policy and pay a recurring monthly or yearly cost (known as premiums) to a health insurance company.  In return the company promises to reimburse a proportion of the medical costs of the insured.  The health insurance company will set premiums based on the calculated risk of an individual.  
@@ -118,8 +119,6 @@ grid.arrange(p1, p2, ncol =2)
 # Formal Data Analysis {#sec:FDA}
 
 Model selection is done via stepwise regression with the full interaction model initially fitted to the data as follows:
-$$y_i = \alpha + \beta_{bmi} x_i +\beta_{age} x_i + \beta_{smoker} \cdot \mathbb{I}_{smoker}(i) + \beta_{bmi, smoker} \cdot \mathbb{I}_{bmi, smoker}(i) + \beta_{age, smoker} \cdot \mathbb{I}_{age, smoker}(i) +\epsilon_i$$
-
 $$y_i = \alpha + \beta_{\mbox{bmi}} \cdot \mbox{bmi}_{i} +\beta_{\mbox{age}} \cdot \mbox{age}_{i} + \beta_{\mbox{Smoker}} \cdot \mathbb{I}_{\mbox{Smoker}}(i) + \beta_{\mbox{bmi, smoker}} \cdot \mathbb{I}_{\mbox{bmi, smoker}}(i) + \beta_{\mbox{age, smoker}} \cdot \mathbb{I}_{\mbox{age, smoker}}(i) +\epsilon_i$$
 where
 
@@ -200,7 +199,7 @@ bind_rows(model.comp.values.full, model.comp.values.m1, model.comp.values.m2, mo
   kable_styling(font_size = 10, latex_options = 'HOLD_position')
 ```
 
-`Full Model` corresponds to the full interaction model, in Table \ref{tab:fullmodel}, `Model 1` consists of only one interaction term between `bmi` and `smoker` shown in Table \ref{tab:bestmodel}, while `Model 2` is the parallel lines model.  Finally, `Model 3` and `Model 4` corresponds to the models with `age` and `smoker`, and `bmi` and `smoker`, respectively.  Table \ref{tab:select} summarizes the Adjusted $R^{2}$, AIC and BIC values obtained for each fitted model. The best model will be the one with that maximizes Adjusted $R^{2}$ and minimizes the AIC and BIC values, which in this case corresponds to `Model 1`.  The same model found to be the best model when model selection was conducted via confidence intervals.  
+`Full Model` corresponds to the full interaction model, in Table \ref{tab:fullmodel}, `Model 1` consists of only one interaction term between `bmi` and `smoker` shown in Table \ref{tab:bestmodel}, while `Model 2` is the parallel lines model.  Finally, `Model 3` and `Model 4` corresponds to the models with `age` and `smoker`, and `bmi` and `smoker`, respectively.  Table \ref{tab:select} summarizes the Adjusted $R^{2}$, AIC and BIC values obtained for each fitted model. The best model will be the one with that maximizes Adjusted $R^{2}$ and minimizes the AIC and BIC values, which in this case corresponds to `Model 1`.  The same model was also found to be the best model when model selection was conducted via confidence intervals.  
 
 The equation of the best fitting model with parameter estimates for non smokers is as follows:
 
@@ -260,15 +259,9 @@ ggplot(regression.points1, aes(x = residual)) +
 
 
 # Conclusions {#sec:Conc}
+Insurance premium estimates from the simulated data suggest that every year increase in age increases health insurance premiums by between (\$`r round(reg2$lower_ci[2], 3)`, \$`r round(reg2$upper_ci[2], 3)`) whether or not the insured is a smoker.  For every unit increase in the BMI of a smoker their insurance premium increases between (\$`r round(reg2$lower_ci[5], 3)`, \$`r round(reg2$upper_ci[5], 3)`) compared to that of a nonsmoker.  An increase in BMI itself does not have a statistically significant effect on insurance premiums.  However, the interaction of `bmi` with `smoker` indicates that smokers tend to have more risk for health complications.  
 
-- Limitations?
-
-How to improve:
-
-- A larger dataset would be better/preffered to judge the assumptions.
-- Also, can consider transformations on our variables.
-- More variables -> there seems to be some confounding factors
-
+The linear model assumptions were found to be suspect and further improvements to the model could be made.  The spread of the charges for smokers is greater than the spread of charges for nonsmoker and generalised linear model that allows for differences in the variances within different groups would better capture this information.  More data on smokers would also help to improve the model as only `r round(100*sum(insur$smoker=="yes")/nrow(insur))`% of the individuals in the study sample are smokers skewing the data.  Other explanatory variables could also be included to further improve the model.  
 
 
 
