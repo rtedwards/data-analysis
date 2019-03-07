@@ -163,7 +163,7 @@ reg1<- as.data.frame(reg.tab1)
 ```
 \newpage
 
-The normality assumption for the full interaction model appear valid as the fitted values are randomly scatterd around mean zero and have constant variance for the explanatory variable age.  However, for the explanatory variable bmi, the assumption of constant variablity is dubious but the assumption of normally distributed residuals seems to hold.  
+The normality assumption for the full interaction model appears valid as the fitted values are randomly scatterd around mean zero and have constant variance for the explanatory variable age.  However, for the explanatory variable bmi, the assumption of constant variablity is dubious but the assumption of normally distributed residuals seems to hold.  
 
 From the results obtained in Table \ref{tab:fullmodel}, we can conclude that there is insufficient evidence that $\beta_{\mbox{age, smoker}}$ differs from zero, as the corresponding confidence interval contains zero (`r reg1[5,6]`, `r reg1[5,7]`).  Consequently, this term is eliminated and the following model with only one interaction term `bmi.smoker` is fitted to the data and the results obtained are shown in Table \ref{tab:bestmodel}:
 
@@ -207,7 +207,7 @@ bind_rows(model.comp.values.full, model.comp.values.m1, model.comp.values.m2, mo
   kable_styling(font_size = 10, latex_options = 'HOLD_position')
 ```
 
-`Full Model` corresponds to the full interaction model, in Table \ref{tab:fullmodel}, `Model 1` consists of only one interaction term between `bmi` and `smoker` shown in Table \ref{tab:bestmodel}, while `Model 2` is the parallel lines model.  Finally, `Model 3` and `Model 4` corresponds to the models with only `age` and `smoker`, and `bmi` and `smoker`, respectively.  Table \ref{tab:select} summarizes the Adjusted $R^{2}$, AIC and BIC values obtained for each fitted model. The best fitting model maximizes Adjusted $R^{2}$ and minimizes the AIC and BIC values, which in this case corresponds to `Model 1`.  The same model was also found to be the best model when model selection was conducted via confidence intervals.  
+`Full Model` corresponds to the full interaction model, in Table \ref{tab:fullmodel}, `Model 1` consists of only one interaction term between `bmi` and `smoker` shown in Table \ref{tab:bestmodel}, while `Model 2` is the parallel lines model.  Finally, `Model 3` and `Model 4` correspond to the models with only `age` and `smoker`, and `bmi` and `smoker`, respectively.  Table \ref{tab:select} summarizes the Adjusted $R^{2}$, AIC and BIC values obtained for each fitted model. The best fitting model maximizes Adjusted $R^{2}$ and minimizes the AIC and BIC values, which in this case corresponds to `Model 1`.  The same model was also found to be the best model when model selection was conducted via confidence intervals.  
 
 The equation of the best fitting model with parameter estimates for nonsmokers is as follows:
 
@@ -269,7 +269,7 @@ Finally, to assess whether the residuals are normally distributed, a histogram i
 # Conclusions {#sec:Conc}
 In summary, an analysis was conducted on the health insurance data to model health insurance premiums based on `age`, `bmi`, and whether an individual `smoke`s and to then identify the variable that best predicts increased insurance charges.  Insurance premium estimates from Model 1 suggest that every year increase in age increases health insurance premiums by between (\$`r round(reg2$lower_ci[2], 3)`, \$`r round(reg2$upper_ci[2], 3)`) whether or not the insured is a smoker.  For every unit increase in the `bmi` of a smoker their insurance premium increases between (\$`r round(reg2$lower_ci[5], 3)`, \$`r round(reg2$upper_ci[5], 3)`) compared to that of a nonsmoker.  An increase in `bmi` itself does not have a statistically significant effect on insurance premiums.  However, the interaction of `bmi` with `smoker` indicates that smokers tend to have more risk for health complications.  
 
-Some of the linear model assumptions were found to be suspect and further improvements to the model could be made.  The spread of the charges for smokers is greater than the spread of charges for nonsmoker and a generalised linear model that allows for differences in the variances within different groups would better capture this information.  The histogram of residuals for nonsmokers is highly skewed to the right with a possible second mode suggesting that there might be another variable not accounted for in this dataset.  More data on smokers would also help to improve the model as only `r round(100*sum(insur$smoker=="yes")/nrow(insur))`% of the individuals in the study sample are smokers.  
+Some of the linear model assumptions were found to be suspect and further improvements to the model could be made.  The spread of the charges for smokers is greater than the spread of charges for nonsmoker and a generalised linear model that allows for differences in the variances within different groups would better capture this information.  The histogram of residuals for nonsmokers is highly skewed to the right with a possible second mode suggesting that there might be another variable not accounted for in this dataset.  More data on smokers would also help to improve the model as only `r round(100*sum(insur$smoker=="yes")/nrow(insur))` percent of the individuals in the study sample are smokers.  
 
 
 
