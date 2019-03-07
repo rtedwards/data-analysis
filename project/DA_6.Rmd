@@ -1,0 +1,272 @@
+---
+title: "Predicting Medical Insurance Charges from Age, BMI and Smoking Status"
+author: "DA Group 6"
+output:
+  pdf_document:
+    latex_engine: pdflatex
+    number_sections: yes
+  word_document: default
+  html_document:
+    df_print: paged
+fig_caption: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, eval = TRUE, warning = FALSE, message = FALSE, comment = NA)
+options(scipen = 999)
+```
+
+```{r libraries}
+library(ggplot2)
+library(dplyr)
+library(moderndive)
+library(skimr)
+library(tidyr)
+library(kableExtra)
+library(gridExtra)
+library(GGally)
+library(broom)
+```
+
+
+```{r data, echo = FALSE, eval = TRUE, warning = FALSE, message = FALSE}
+insurance <- read.csv("insurance.csv")
+
+insur <- insurance %>%
+  filter(region == "southeast") %>%
+  select(charges, age, bmi, smoker)
+```
+
+
+# Introduction {#sec:Intro}
+
+Health insurance is an insurance that covers a varying portion of the medical expenses a person may incur.  Risk is spread across all persons covered by the insurer.  Insured individuals enroll in a health insurance policy and pay a recurring monthly or yearly cost (known as premiums) to a health insurance company.  In return, the company promises to reimburse a proportion of the medical costs of the insured.  The health insurance company will set premiums based on the calculated risk of an individual.  
+
+The premium an individual pays, depends on a number of factors.  In particular, the higher the risk of having health problems, the higher the premium will be.  For instance, overweight or obese persons are more likely to develop heart disease when compared with people of normal weight.  Moreover, smoking is linked with an increased risk of lung cancer when compared to individuals who do not smoke.  Apart from these, there is a tendency for health insurance rates to escalate with increasing age, since older people are more prone to health problems.  In these situations, one might expect these individuals to have a higher risk of large medical expenses.
+
+The main goal of this report is to predict the total yearly medical costs (`charges`) a health insurance company will charge an individual based on the age (`age`) (in years), the corresponding body mass index (`bmi`) and from whether the insured smokes tobacco or not (`smoker`).  The `bmi` is a measure of body fat, which is defined as the body weight (in kg) divided by the square of the body height (in $\mbox{m}^{2}$).  The analysed data consists of a sample of `r nrow(insur)` individuals living in the South East region of the United States from a simulated dataset based on demographic statistics obtained from the US Census Bureau, approximating real world data.  The insurance dataset contains `r nrow(insurance)` observations, which contain hypothetical data on medical expenses for patients in the United States.  
+
+Section \ref{sec:EDA} consists of an exploratory data analysis to gain a better understanding of the distribution of the features used under this study.  In Section \ref {sec:FDA} a backward elimination stepwise regression is used to select the best regression model to predict the insurance charges after fitting a number of regression models to the data.  Moreover, the model assumptions are also checked here.  Finally, Section \ref{sec:Conc} summarises the results obtained from the analysis and provides ideas for model improvement.
+
+
+# Exploratory Data Analysis {#sec:EDA}
+
+To get an idea of the distribution of the data, the following summary statistics were obtained for the categorical variable `smoker` (Table \ref{tab:sum1}) and for the continuous variables `charges`, `age` and `bmi` (Table \ref{tab:sum2}).
+
+```{r summary1, echo = FALSE, eval = TRUE, warning = FALSE, message = FALSE}
+
+insur %>%
+  group_by(smoker) %>%
+  summarise(n()) %>%
+  kable(col.names = c("Smoker", "n"),
+        caption = '\\label{tab:sum1} Numbers of smokers and nonsmokers.', booktabs = TRUE, format = "latex") %>%
+  kable_styling(font_size = 10, latex_options = "hold_position")
+```
+
+Table \ref{tab:sum1} shows that out of the `r nrow(insur)` individuals, only `r round(100*sum(insur$smoker=="yes")/nrow(insur))`% of the individuals in the study sample smoke (`r sum(insur$smoker=="no")` nonsmokers vs `r sum(insur$smoker=="yes")` smokers).  
+
+```{r summary2, echo = FALSE, eval = TRUE, warning = FALSE, message = FALSE}
+
+insur$age <- as.numeric(insur$age)
+
+skim_with(numeric = list(hist = NULL, missing = NULL, complete = NULL))
+insur %>%
+  skim_to_list() %>%
+  .$numeric %>%
+  kable(col.names = c("Variable", "n", "Mean", "SD", "Minimum", "1st quartile", "Median", "3rd quartile", "Maximum"),
+        caption = '\\label{tab:sum2} Summary statistics on insurance charges, age and bmi.', booktabs = TRUE, format = "latex") %>%
+  kable_styling(font_size = 10, latex_options = "hold_position")
+```
+
+Looking at Table \ref{tab:sum2}, the mean age of the individuals is `r round(mean(insur$age), 2)` years, with a standard deviation (`SD`) of `r round(sd(insur$age), 2)` years and the middle 50% are between `r round(quantile(insur$age, 0.25), 2)` and `r round(quantile(insur$age, 0.75), 2)` years of age.  Next, the middle 50% of the bmi lies between `r round(quantile(insur$bmi, 0.25), 2)` and `r round(quantile(insur$bmi, 0.75), 2)` $\mbox{kg/m}^{2}$, with an average bmi value of `r round(mean(insur$bmi), 2)` $\mbox{kg/m}^{2}$ and standard deviation `r round(sd(insur$bmi), 2)` $\mbox{kg/m}^{2}$.  Finally, the middle 50% of the data for the medical costs (charges) lies between \$`r round(quantile(insur$charges, 0.25), 2)` and \$`r round(quantile(insur$charges, 0.75), 2)`, with an average of \$`r round(mean(insur$charges), 2)`.  The variation in the mean total charges appears to be quite high, with a value of \$`r round(sd(insur$charges), 2)`.
+
+```{r corr.coef, echo = FALSE, eval = TRUE, warning = FALSE, message = FALSE}
+Cor.1 <- insur %>%
+  get_correlation(formula = charges ~ age)
+
+Cor.2 <- insur %>%
+  get_correlation(formula = charges ~ bmi)
+
+Cor.3 <- insur %>%
+  get_correlation(formula = bmi ~ age)
+```
+
+In order to measure the degree of association between the continuous variables in the study, the pairs scatterplot is plotted in Figure \ref {fig:cor}. The plot shows that there is no strong relationship between any two continuous variables.  To confirm this, the correlation coefficients for each pair of variables were calculated.  The correlation between the response variable `charges` and the explanatory variables `age` and `bmi` were found to be `r round(Cor.1, 3)` and `r round(Cor.2, 3)`, respectively.  Moreover, there does not seem to be any linear association between the two continuous explanatory variables `age` and `bmi` (`r round(Cor.3, 3)`), implying that there is no evidence of multicollinearity in the data.
+```{r correlation, echo = FALSE, eval = TRUE, warning = FALSE, message = FALSE, out.width = '55%', fig.align="center", fig.pos="H", fig.cap = "\\label{fig:cor}Pairs plot between charges, age and bmi"}
+
+d <- insur[,1:3]
+p1 <- pairs(d, color="lightseagreen")
+p2 <- boxplot(data = insur, charges ~ smoker)
+#grid.arrange(p1, p2, ncol = 2)
+
+require(GGally)
+ggpairs(insur, mapping = ggplot2::aes(colour = smoker))
+```
+
+Figure \ref{fig:scat} on the next page, shows two scatterplots of the insurance charges against each of the explanatory variables by smoking status of the individuals.  From the left plot, showing the relationship between charges and age with smoking status accounted for, it is evident that older the individual, the higher their health insurance premium.  The plot indicates that on average, people who do not smoke, pay less than \$40000 whereas smokers pay up to \$60000 on their health insurance. However, from the parallel slopes, the effect of age on insurance charges appears to be the same between smokers and nonsmokers.  On the other hand, the slopes of the lines of the plot on the right are distinctly different, indicating the effect of bmi on insurance charges changes with smoking status.  From the plot, as the bmi of a smoker increases, the corresponding insurance charges increase, whereas in nonsmokers, an increase in  bmi does not seem to increase the insurance charges.  From both plots it appears that smoking people pay more on their health insurance when compared with those who do not smoke. 
+
+To predict the medical insurance charges, a number of linear regression models will be fitted with age, bmi and smoking status as potential predictors.
+
+```{r scatplot, fig.width=13, fig.pos = "H", fig.align = "center", fig.cap = "\\label{fig:scat}Scatterplots of insurance charges by age and smoking status (left) and insurance charges by bmi and smoking status (right)"}
+p1 <- ggplot(insur, aes(x = age, y = charges, color = smoker)) +
+  geom_point() +
+  labs(x = "Age (in years)", y = "Insurance charges (in $)", color = "smoker") +
+  geom_smooth(method = "lm", se = FALSE)
+
+p2 <- ggplot(insur, aes(x = bmi, y = charges, color = smoker)) +
+  geom_point() +
+  labs(x = "BMI", y = "Insurance charges (in $)", color = "smoker") +
+  geom_smooth(method = "lm", se = FALSE)
+
+grid.arrange(p1, p2, ncol =2)
+```
+
+# Formal Data Analysis {#sec:FDA}
+
+Model selection is done via stepwise regression with the full interaction model initially fitted to the data as follows:
+$$y_i = \alpha + \beta_{\mbox{bmi}} \cdot \mbox{bmi}_{i} +\beta_{\mbox{age}} \cdot \mbox{age}_{i} + \beta_{\mbox{smoker}} \cdot \mathbb{I}_{\mbox{smoker}}(i) + \beta_{\mbox{bmi, smoker}} \cdot \mathbb{I}_{\mbox{bmi, smoker}}(i) + \beta_{\mbox{age, smoker}} \cdot \mathbb{I}_{\mbox{age, smoker}}(i) +\epsilon_i$$
+where
+
+- $\alpha$ is the intercept of the regression line for nonsmokers;
+- $\beta_{\mbox{bmi}}$ is the slope of the regression line for both smokers and nonsmokers;
+- $\mbox{bmi}_{i}$ is the bmi of the $i^{th}$ observation
+- $\beta_{\mbox{age}}$ is the slope of the regression line for both smokers and nonsmokers;
+- $\mbox{age}_{i}$ is the age of the $i^{th}$ observation
+- $\beta_{\mbox{smoker}}$ is the additional term added to $\alpha$ to get the intercept of the regression line for smokers; and
+- $\mathbb{I}_{\mbox{smoker}}(i)$ is an indicator function such that
+
+$$\mathbb{I}_{\mbox{smoker}}(i)=\left\{
+\begin{array}{ll}
+1 ~~~ \mbox{if the} ~ i \mbox{th observation smokes}, \\
+0 ~~~ \mbox{Otherwise}.\\
+\end{array}
+\right.$$
+
+Also, $\beta_{\mbox{bmi, smoker}} \cdot \mathbb{I}_{\mbox{bmi, smoker}}(i)$ and $\beta_{\mbox{age, smoker}} \cdot \mathbb{I}_{\mbox{age, smoker}}(i)$ correspond to the interaction terms.
+
+The parameter estimates obtained after fitting the above full model are summarised in Table \ref{tab:fullmodel}.
+
+
+```{r full, echo = FALSE, eval = TRUE, warning = FALSE, message = FALSE}
+
+model1 <- lm(charges ~ age + bmi + smoker + age*smoker + bmi*smoker, data = insur)
+
+get_regression_table(model1) %>%
+  kable(digits = 3, caption = '\\label{tab:fullmodel} Parameter estimates obtained from the full model charges = age + bmi + smoker + age.smoker + bmi.smoker', booktabs = TRUE, format = "latex") %>%
+  kable_styling(font_size = 10, latex_options = "hold_position")
+
+reg.tab1<- get_regression_table(model1)
+reg1<- as.data.frame(reg.tab1)
+```
+\newpage
+
+The normality assumption for the full interaction model appear valid as the fitted values are randomly scatterd around mean zero and have constant variance for the explanatory variable age.  However, for the explanatory variable bmi, the assumption of constant variablity is dubious but the assumption of normally distributed residuals seems to hold.  
+
+From the results obtained in Table \ref{tab:fullmodel}, we can conclude that there is insufficient evidence that $\beta_{\mbox{age, smoker}}$ differs from zero, as the corresponding confidence interval contains zero (`r reg1[5,6]`, `r reg1[5,7]`).  Consequently, this term is eliminated and the following model with only one interaction term `bmi.smoker` is fitted to the data and the results obtained are shown in Table \ref{tab:bestmodel}:
+
+```{r best, echo = FALSE, eval = TRUE, warning = FALSE, message = FALSE}
+
+best <- lm(charges ~ age + bmi + smoker + bmi*smoker, data = insur)
+
+coeff <- best %>%
+  coef() %>%
+  as.numeric()
+
+get_regression_table(best) %>%
+  kable(digits = 3, caption = '\\label{tab:bestmodel} Parameter estimates obtained from the model charges = age + bmi + smoker + bmi.smoker', booktabs = TRUE, format = "latex") %>%
+  kable_styling(font_size = 10, latex_options = "hold_position")
+
+reg.tab2<- get_regression_table(best)
+reg2<- as.data.frame(reg.tab2)
+
+```
+
+Table \ref{tab:bestmodel} shows that the confidence interval for the bmi (`r reg2[3,6]`, `r reg2[3,7]`) contains zero, implying that bmi is not statistically significantly related to insurance charges, when keeping all the other variables constant.  However, the interaction term between `bmi` and `smoker` is found to be significant, since the confidence interval (`r reg2[5,6]`, `r reg2[5,7]`) does not contain zero.  The interaction between `bmi` and `smoker` can be seen in the right plot in Figure \ref{fig:scat} where the regression lines for smokers and nonsmokers have different slopes .  This suggests that the best fitted model to predict the insurance charges is the fitted model in Table \ref{tab:bestmodel}.  In order to verify this, the following stepwise model selection approach was also conducted below in Table \ref{tab:modelselection}:
+
+```{r modelselection, echo = FALSE, eval = TRUE, warning = FALSE, message = FALSE}
+
+model.comp.values.full <- glance(lm(charges ~ age + bmi + smoker + age*smoker + bmi*smoker, data = insur))
+
+model.comp.values.m1 <- glance(lm(charges ~ age + bmi + smoker + bmi*smoker, data = insur))
+
+model.comp.values.m2 <- glance(lm(charges ~ age + bmi + smoker, data = insur))
+
+model.comp.values.m3 <- glance(lm(charges ~ age + smoker, data = insur))
+
+model.comp.values.m4 <- glance(lm(charges ~ bmi + smoker, data = insur))
+
+Models <- c('Full Model', 'Model 1', 'Model 2', 'Model 3', 'Model 4')
+
+bind_rows(model.comp.values.full, model.comp.values.m1, model.comp.values.m2, model.comp.values.m3, model.comp.values.m4, .id = "Model") %>%
+  select(Model, adj.r.squared, AIC, BIC) %>%
+  mutate(Model = Models) %>%
+   kable(caption = '\\label{tab:select} Model selection', booktabs = TRUE, format = "latex") %>%
+  kable_styling(font_size = 10, latex_options = 'HOLD_position')
+```
+
+`Full Model` corresponds to the full interaction model, in Table \ref{tab:fullmodel}, `Model 1` consists of only one interaction term between `bmi` and `smoker` shown in Table \ref{tab:bestmodel}, while `Model 2` is the parallel lines model.  Finally, `Model 3` and `Model 4` corresponds to the models with `age` and `smoker`, and `bmi` and `smoker`, respectively.  Table \ref{tab:select} summarizes the Adjusted $R^{2}$, AIC and BIC values obtained for each fitted model. The best fitting model maximizes Adjusted $R^{2}$ and minimizes the AIC and BIC values, which in this case corresponds to `Model 1`.  The same model was also found to be the best model when model selection was conducted via confidence intervals.  
+
+The equation of the best fitting model with parameter estimates for nonsmokers is as follows:
+
+$$\widehat{\mbox{Charges}} = `r round(coeff[1],3)` + `r round(coeff[2],3)`\cdot{\mbox{age}} `r round(coeff[3],3)`\cdot{\mbox{bmi}} $$ 
+
+while the regression line for smokers is given by:
+$$
+\begin{aligned}
+\widehat{\mbox{Charges}}  &= `r round(coeff[1],3)` + `r round(coeff[2],3)`\cdot{\mbox{age}} `r  round(coeff[3],3)`\cdot{\mbox{bmi}} `r round(coeff[4],3)` + `r round(coeff[5],3)`\cdot{\mbox{bmi}} \\
+                          &= `r round(coeff[1]+coeff[4],3)` + `r round(coeff[2],3)`\cdot{\mbox{age}}+ `r round(coeff[3]+coeff[5],3)`\cdot{\mbox{bmi}}
+\end{aligned}
+$$ 
+
+When bmi remains constant, for every one year increase in the age of the insured, the corresponding insurance charges will increase by `r round(coeff[2],3)`, whether the person smokes or not.  Holding age constant, a one unit increase in bmi decreases insurance charges for nonsmokers by `r abs(round(coeff[3],3))` but increase by `r round(coeff[3] + coeff[5],3)` for nonsmokers.  Health insurance charges are significantly larger for smokers than nonsmokers. 
+
+In order for this analysis to be valid, the model assumptions for linear regression should be satisfied.  The assumptions of zero mean and constant variance of the residuals for the explanatory variables and the fitted values are checked in Figures \ref{fig:resid1} and \ref{fig:resid2}, respectively.
+
+```{r residplot11, echo=FALSE,fig.width = 13, fig.align = "center", fig.cap = "\\label{fig:resid1} Residuals vs the explanatory variable age and bmi by Smoker.", message = FALSE, fig.pos="H"}
+
+
+regression.points1 <- get_regression_points(best)
+
+w1<-ggplot(regression.points1, aes(x = bmi, y = residual)) +
+  geom_jitter(color="aquamarine3") +
+  labs(x = "bmi", y = "Residual") +
+  geom_hline(yintercept = 0, col = "blue", size = 1) +
+  facet_wrap(~ smoker)
+
+w2<-ggplot(regression.points1, aes(x = age, y = residual)) +
+  geom_jitter(color="coral1") +
+  labs(x = "age", y = "Residual") +
+  geom_hline(yintercept = 0, col = "blue", size = 1) +
+  facet_wrap(~ smoker)
+
+grid.arrange(w2, w1, ncol =2)
+```
+
+The residuals in Figure \ref{fig:resid1} seem to be approximately evenly spread above and below the zero line for smokers and nonsmokers across all levels of the explanatory variables.  Hence, the assumption that the residuals have mean zero appears reasonable.  Moreover, the observations seem to be randomly scattered, implying constant variance, with the notable outlier in smokers.  The latter could be due to the fact that there are relatively few smokers in the sample (`r sum(insur$smoker=="yes")` smokers from Table \ref{tab:sum1}).  Figure \ref {fig:resid2} shows scatterplots of the residuals against fitted values by smoking status.  
+
+```{r residplot2, echo=FALSE, out.width = '55%', fig.align = "center", fig.cap = "\\label{fig:resid2} Residuals vs the fitted values by Smoker.", message = FALSE, fig.pos="H"}
+ggplot(regression.points1, aes(x = charges_hat, y = residual)) + 
+  geom_point(color="coral1") +
+  labs(x = "Fitted values", y = "Residual") +
+  geom_hline(yintercept = 0, col = "blue", size = 1) +
+  facet_wrap(~ smoker)
+```
+The points in Figure \ref {fig:resid2} have zero mean and constant variance, but there are a number of residuals with large variance above the zero line.  The linear model assumptions are somewhat dubious, and further investigation could illuminate possible underlying covariate patterns.  
+
+Finally, to assess whether the residuals are normally distributed, a histogram is plotted in Figure \ref {fig:resid3}.  The residuals for smokers seem to be bell-shaped and centered at zero, with the exception of one outlier, having a large positive residual.  On the other hand, the histogram for people who do not smoke is centered around zero skewed to the right.  Thus, the assumption of normally distributed random errors might be slightly dubious.  However, overall, both histograms appear to be realtively symmetrical and bell-shaped, and hence, the assumption of normally distributed random errors seems plausible for the best fitted model.
+
+```{r residplot3, echo=FALSE, out.width= '56%', fig.align = "center", fig.cap = "\\label{fig:resid3} Histogram of residuals.", message = FALSE, fig.pos="H"}
+ggplot(regression.points1, aes(x = residual)) + 
+  geom_histogram(color = "white", fill="aquamarine3") +
+  labs(x = "Residual") +
+  facet_wrap(~ smoker)
+```
+
+
+# Conclusions {#sec:Conc}
+Insurance premium estimates from the simulated data suggest that every year increase in age increases health insurance premiums by between (\$`r round(reg2$lower_ci[2], 3)`, \$`r round(reg2$upper_ci[2], 3)`) whether or not the insured is a smoker.  For every unit increase in the BMI of a smoker their insurance premium increases between (\$`r round(reg2$lower_ci[5], 3)`, \$`r round(reg2$upper_ci[5], 3)`) compared to that of a nonsmoker.  An increase in BMI itself does not have a statistically significant effect on insurance premiums.  However, the interaction of `bmi` with `smoker` indicates that smokers tend to have more risk for health complications.  
+
+The linear model assumptions were found to be suspect and further improvements to the model could be made.  The spread of the charges for smokers is greater than the spread of charges for nonsmoker and generalised linear model that allows for differences in the variances within different groups would better capture this information.  The category for nonsmokers is highly skewed to the right.  A log transformation on charges could help improve skewness in the data.  More data on smokers would also help to improve the model as only `r round(100*sum(insur$smoker=="yes")/nrow(insur))`% of the individuals in the study sample are smokers skewing the data.  Other explanatory variables could also be included to further improve the model.  
+
+
+
