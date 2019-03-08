@@ -3,13 +3,13 @@ title: "Generalized Linear Models"
 author: "Robert Edwards"
 date: "8 March 2019"
 output:
-  html_document:
-    df_print: paged
   pdf_document:
     fig_caption: yes
     keep_tex: yes
     latex_engine: pdflatex
     number_sections: yes
+  html_document:
+    df_print: paged
 header-includes: 
   \usepackage{float} 
   \floatplacement{figure}{H}
@@ -22,14 +22,12 @@ knitr::opts_chunk$set(echo = FALSE, eval = TRUE, warning = FALSE, message = FALS
 ```{r libraries, echo = FALSE, eval = TRUE, warning = FALSE, message = FALSE}
 library(ggplot2)
 library(dplyr)
-library(tidyr)
 library(moderndive)
-library(skimr)
 library(kableExtra)
 library(gridExtra)
-library(janitor)
-library(infer)
-library(broom)
+library(sjPlot)
+library(stats)
+library(readr)
 ```
 
 #Introduction {#sec:Intro}
@@ -108,7 +106,7 @@ evals.gender <- evals %>%
 ```
 
 Now, let's look at a boxplot of `age` by `gender` to get an initial impression of the data:
-```{r boxplot1, echo = TRUE, eval = TRUE, warning = FALSE, message = FALSE, out.width = '50%', fig.cap = "\\label{fig.plot1}Teaching instructor age by gender"}
+```{r boxplot1, echo = TRUE, eval = TRUE, warning = FALSE, message = FALSE, fig.align = 'center', out.width = '50%', fig.cap = "\\label{fig.plot1}Teaching instructor age by gender"}
 ggplot(data = evals.gender, aes(x = gender, y = age, fill = gender)) +
   geom_boxplot() +
   labs(x = "Gender", y = "Age") +
@@ -166,8 +164,9 @@ age.logodds.lower <- mod.coef.logodds["age", "Estimate"] - 1.96 * mod.coef.logod
 age.logodds.upper <- mod.coef.logodds["age", "Estimate"] + 1.96 * mod.coef.logodds["age", "Std. Error"]
 ```
 
-Hence the point estimate for the log-odds is `r round(model$coefficients[2],2)`, which has a corresponding 95% confidence interval of (`r age.logodds.lower`, `r age.logodds.upper`).  This can be displayed graphically using the `plot_model` function from the `sjPlot` package simply passing our `model` as an argument:
-```{r plot2, echo = TRUE, eval = TRUE, warning = FALSE, message = FALSE, out.width = '50%', fig.cap = "\\label{fig.plot2}The log-Odds of age for Male instructors"}
+Hence the point estimate for the log-odds is `r round(model$coefficients[2],2)`, which has a corresponding 95% confidence interval of (`r round(age.logodds.lower, 2)`, `r round(age.logodds.upper, 2)`).  This can be displayed graphically using the `plot_model` function from the `sjPlot` package simply passing our `model` as an argument:
+
+```{r plot2, echo = TRUE, eval = TRUE, warning = FALSE, message = FALSE, fig.align = 'center', out.width = '50%', fig.cap = "\\label{fig.plot2}The log-Odds of age for Male instructors"}
 plot_model(model, show.values = TRUE, transform = NULL, title = "Log-Odds (Male instructor)", show.p = FALSE)
 ```
 
@@ -178,29 +177,143 @@ Some of the interesting arguments that can be passed to the `plot_model` functio
 + `transform`: A character vector naming the function that will be applied to the estimates. The default transformation uses exp to display the odds ratios, while transform = NULL displays the log-odds; and
 + `vline.color`: colour of the vertical "zero effect" line.
 
-Further details on using `plot_model` can be found here and here.
+Further details on using `plot_model` can be found [here](https://strengejacke.wordpress.com/2017/10/23/one-function-to-rule-them-all-visualization-of-regression-models-in-rstats-w-sjplot/) and [here](https://strengejacke.github.io/sjPlot/index.html)
 
 Now, let's add the estimates of the log-odds to our data set:
 
+```{r echo = TRUE, eval = TRUE, warning = FALSE, message = FALSE}
+evals.gender <- evals.gender %>%
+  mutate(logodds.male = predict(model))
+```
+
+**What is the log-odds of a 63 year old instructor being male?**  
+
++ The log-odds of a 62 year-old instructor being male is `r round(model$coefficients[1] + model$coefficients[2]*62, 2)`
+
+**What is the log-odds of a 29 year old instructor being male?**
+
++ The log-odds of a 29 year-old instructor being male is `r round(model$coefficients[1] + model$coefficients[2]*29, 2)`
+
+##Odds
+Typically we would like to work on the **odds** scale as it is easier to interpret an odds-ratio as opposed to the log-odds-ratio.  To obatin the odds we simply exponentiate the log-odds, that is
+$$\frac{p}{1-p} = \mbox{exp}(\alpha + \beta \cdot \mbox{age})$$
+
+```{r echo = TRUE, eval = TRUE, warning = FALSE, message = FALSE}
+model %>%
+  coef() %>%
+  exp()
+```
+
+On the odds scale, the value of the intercept (`r round(exp(model$coefficients[1]), 2)`) gives the odds of a teaching instructor being male given their `age = 0`, which is obviously not a viable age for a teaching instructor, and hence why this value is very close to zero.  For `age` we have an odds of `r round(exp(model$coefficients[2]),2)`, which indicates that for every 1 unit increase in age, the odds of the teaching instructor being male increase by a factor of `r round(exp(model$coefficients[2]),2)`.  So how is this calculated?  Let's look at the odds-ratio obtained from instructors aged 51 to 52 years old, that is, a 1 units difference:
+$$\frac{\mbox{Odds}_{\mbox{age=52}}}{\mbox{Odds}_{\mbox{age=51}}} = \Bigg( \frac{ \frac{p_{age=52}}{1-p_{age=52}} } { \frac{p_{age=51}}{1-p_{age=51}} } \Bigg) = \frac{\mbox{exp}(\alpha + \beta \cdot 52)}{\mbox{exp}(\alpha + \beta \cdot 51)} = {\mbox{exp}(\beta \cdot (52 - 51))}$$
+
+For example, the odds of a teaching instructor who is 45 years old being male is given by
+$$\frac{p}{1-p}= \mbox{exp}(\alpha + \beta \cdot \mbox{age}) = \mbox{exp}( `r round(exp(model$coefficients[1]),2)` + `r round(exp(model$coefficients[2]),2)` \cdot 45) = `r round(exp(model$coefficients[1]) + exp(model$coefficients[2])*45,1)`$$
+
+This can be interpreted as the chances of an instructor who is 45 being a male are 15% greater than them being female.  We can obtain a 95% confidence interval for the odds by simply exponentiating the lower and upper bounds of our log-odds interval. 
+
+```{r echo = TRUE, eval = TRUE, warning = FALSE, message = FALSE}
+age.odds.lower <- exp(age.logodds.lower)
+age.odds.upper <- exp(age.logodds.upper)
+```
+
+Hence the point estimate for the odds is `r round(exp(model$coefficients[1]),2)`, which has a corresponding 95% confidence interval of (`r round(age.odds.lower,2)`, `r round(age.odds.upper,2)`).  This can be displayed graphically using the `plot_model` function from the `sjPlot` package by simply passing our `model` as an argument as well as removing `transform = NULL` (the default transformation is exponential):
+
+```{r plot3, echo = TRUE, eval = TRUE, warning = FALSE, message = FALSE, fig.align = 'center', out.width = '50%', fig.cap = "\\label{fig.plot3}The odds of age for Male instructors"}
+plot_model(model, show.values = TRUE, axis.lim = c(1,1.5), 
+           title = "Odds (Male instructor)", show.p = FALSE)
+```
+
+**Note**: As the 95% confidence interval is so narrow it is hard to see it displayed in the plot, but it is included by default.  The `axis.lim = c(1,1.5)` argument improves its visibility as seen here.  
+  
+Now, let's add the estimates of the odds to our data set:
+
+```{r echo = TRUE, eval = TRUE, warning = FALSE, message = FALSE}
+evals.gender <- evals.gender %>%
+  mutate(odds.male = exp(logodds.male))
+```
+
+**What is the odds of a 47 year old instructor being male?**  
+
++ The log-odds of a 62 year-old instructor being male is `r round(exp(model$coefficients[1] + model$coefficients[2]*47), 2)`
+
+**What is the log-odds of a 56 year old instructor being male?**
+
++ The odds of a 56 year-old instructor being male is `r round(exp(model$coefficients[1] + model$coefficients[2]*56), 2)`
 
 
+##Probabilities
+We can obtain the probability $p=\mbox{Prob(Male)}$ using the following transformation:
+$$p = \frac{\mbox{exp}(\alpha + \beta \cdot \mbox{age})}{1 + \mbox{exp}(\alpha + \beta \cdot \mbox{age})}$$
 
+For example, the probabilit of a teaching instructor who is 52 years old being male is
 
+$$p = \frac{\mbox{exp}(\alpha + \beta \cdot \mbox{age})}{1 + \mbox{exp}(\alpha + \beta \cdot \mbox{age})} = \frac{\mbox{exp}(`r model$coefficients[1]` + `r model$coefficients[2]` \cdot \mbox{52})}{1 + \mbox{exp}(`r model$coefficients[1]` + `r model$coefficients[2]` \cdot \mbox{52})}$$
 
+which can be computed in R as follows:
 
-```{r echo = TRUE, eval = FALSE, warning = FALSE, message = FALSE}
+```{r echo = TRUE, eval = TRUE, warning = FALSE, message = FALSE}
+p.num <- exp(mod.coef.logodds["(Intercept)", "Estimate"] + 
+               mod.coef.logodds["age", "Estimate"] * 52)
+p.denom <- 1 + p.num
+p.num/p.denom
+```
+
+The `plogis()` function from the `stats` library can also be used to obtain probabilities from the log-odds:
+
+```{r echo = TRUE, eval = TRUE, warning = FALSE, message = FALSE}
+plogis(mod.coef.logodds["(Intercept)", "Estimate"] + 
+         mod.coef.logodds["age", "Estimate"] * 52)
+```
+
+Let's add the probabilities to our data, which is done using the `fitted()` function:
+
+```{r echo = TRUE, eval = TRUE, warning = FALSE, message = FALSE}
+evals.gender <- evals.gender %>%
+  mutate(probs.male = fitted(model))
+```
+
+**Note*: `predict(model, type = "response")` will also provide the estimated probabilities. 
+
+**What is the probability of a 3 year old instructor being female?**  
+```{r echo = TRUE, eval = TRUE, warning = FALSE, message = FALSE}
+q5 <- evals.gender %>%
+  filter(age == 33, gender == "female")
+```
+
++ The log-odds of a 33 year-old instructor being female is `r round(1 - q5$probs.male[1], 2)`
+
+**What is the log-odds of a 47 year old instructor being male?**
+```{r echo = TRUE, eval = TRUE, warning = FALSE, message = FALSE}
+q6 <- evals.gender %>%
+  filter(age == 47, gender == "male")
+```
+
++ The odds of a 47 year-old instructor being male is `r round(q6$probs.male[1], 2)`
+
+Finally, we can plot the probability of being male using the `geom_smooth()` function by giving `method = "glm"` and `methods.args = list(family = "binomial")` as follows:
+
+```{r plot4, echo = TRUE, eval = FALSE, warning = FALSE, message = FALSE, fig.align = 'center', out.width = '50%', fig.cap = "\\label{fig.plot4}Probability of teaching instructor being male by age."}
 evals.gender <- evals.gender %>%
                   mutate(probs.male = fitted(model))
 
 ggplot(data = evals.gender, aes(x = age, y = probs.male)) +
-  geom_dotplot(dotsize = 0.6, alpha = 0.2, aes(fill = gender), binwidth = 1, stackgroups = TRUE) +
+  geom_dotplot(dotsize = 0.6, alpha = 0.2, aes(fill = gender), 
+               binwidth = 1, stackgroups = TRUE) +
   geom_smooth(method = "glm",
               method.args = list(family = "binomial"),
               se = FALSE) +
   labs(x = "Age", y = "Probability of instructor being male")
 ```
 
+**Note**: the ages of all teaching instructors have been superimposed as a dotplot using `geom_dotplot()`.  
+  
+The `plot_model()` function from the `sjPlot` package can also produce the estimated probabilities by `age` as follows:
 
+```{r plot5, echo = TRUE, eval = TRUE, warning = FALSE, message = FALSE, fig.align = 'center', out.width = '50%', fig.cap = "\\label{fig.plot5}Probability of teaching instructor being male by age"}
+plot_model(model, type = "pred", title = "", 
+           axis.title = c("Age", "Prob. of instructor being male"))
+```
 
 
 
