@@ -1,6 +1,6 @@
 ---
 title: "Practice Class Test2 Template"
-author: "ENTER YOUR STUDENT NUMBER HERE"
+author: "2416963E"
 output: pdf_document
 ---
 

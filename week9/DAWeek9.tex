@@ -114,28 +114,31 @@
 }
 
 \setlength{\droptitle}{-2em}
+
   \title{Generalized Linear Models}
-  \pretitle{\vspace{\droptitle}\centering\huge}
+    \pretitle{\vspace{\droptitle}\centering\huge}
   \posttitle{\par}
-  \author{Robert Edwards}
-  \preauthor{\centering\large\emph}
+    \author{Robert Edwards}
+    \preauthor{\centering\large\emph}
   \postauthor{\par}
-  \predate{\centering\large\emph}
+      \predate{\centering\large\emph}
   \postdate{\par}
-  \date{8 March 2019}
+    \date{8 March 2019}
 
 \usepackage{booktabs}
 \usepackage{longtable}
 \usepackage{array}
 \usepackage{multirow}
-\usepackage[table]{xcolor}
 \usepackage{wrapfig}
 \usepackage{float}
 \usepackage{colortbl}
 \usepackage{pdflscape}
 \usepackage{tabu}
 \usepackage{threeparttable}
+\usepackage{threeparttablex}
 \usepackage[normalem]{ulem}
+\usepackage{makecell}
+\usepackage{xcolor}
 
 \usepackage{float} \floatplacement{figure}{H}
 
@@ -331,7 +334,12 @@ an initial impression of the data:
 \end{Shaded}
 
 \begin{figure}
-\includegraphics[width=0.5\linewidth]{DAWeek9_files/figure-latex/boxplot1-1} \caption{\label{fig.plot1}Teaching instructor age by gender}\label{fig:boxplot1}
+
+{\centering \includegraphics[width=0.5\linewidth]{DAWeek9_files/figure-latex/boxplot1-1} 
+
+}
+
+\caption{\label{fig.plot1}Teaching instructor age by gender}\label{fig:boxplot1}
 \end{figure}
 
 Here we can see that the male teaching instructors tend to be older than
@@ -343,9 +351,415 @@ teaching instructor being male or female.
 
 To fit a logistic regression model we will use the generalised linear
 model function \texttt{glm}, which acts in a very similar manner to the
-lm function we have used previously. We only have to deal with an
-additional argument. The logistic regression model with gender as the
-response and age as the explanatory variable is given by:
+\texttt{lm} function we have used previously. We only have to deal with
+an additional argument. The logistic regression model with
+\textbf{gender} as the response and \textbf{age} as the explanatory
+variable is given by:
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{model <-}\StringTok{ }\KeywordTok{glm}\NormalTok{(gender }\OperatorTok{~}\StringTok{ }\NormalTok{age, }\DataTypeTok{data =}\NormalTok{ evals.gender, }\DataTypeTok{family =} \KeywordTok{binomial}\NormalTok{(}\DataTypeTok{link =} \StringTok{"logit"}\NormalTok{))}
+\end{Highlighting}
+\end{Shaded}
+
+Here we include the additional \texttt{family} argument, which states
+the distribution and link function we would like to use. Hence
+\texttt{family\ =\ binomial(link\ =\ "logit")} states we have a binary
+response variable, and thus have a binomial distribution, with its
+corresponding \textbf{logit link} function. Now, let's take a look at
+the summary produced from our logistic regression model:
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{model }\OperatorTok{%>%}
+\StringTok{  }\KeywordTok{summary}\NormalTok{()}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+
+Call:
+glm(formula = gender ~ age, family = binomial(link = "logit"), 
+    data = evals.gender)
+
+Deviance Residuals: 
+    Min       1Q   Median       3Q      Max  
+-1.7134  -1.1815   0.7238   1.0180   1.4778  
+
+Coefficients:
+            Estimate Std. Error z value Pr(>|z|)    
+(Intercept) -2.69795    0.51194  -5.270 1.36e-07 ***
+age          0.06296    0.01059   5.948 2.71e-09 ***
+---
+Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+
+(Dispersion parameter for binomial family taken to be 1)
+
+    Null deviance: 630.30  on 462  degrees of freedom
+Residual deviance: 591.41  on 461  degrees of freedom
+AIC: 595.41
+
+Number of Fisher Scoring iterations: 4
+\end{verbatim}
+
+Firstly, the baseline category for our binary response is
+\texttt{female}. This is due to the default baseline in R being taken as
+the one which comes first alphabetically, which can be seen from the
+\texttt{levels} function:
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\KeywordTok{levels}\NormalTok{(evals.gender}\OperatorTok{$}\NormalTok{gender)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+[1] "female" "male"  
+\end{verbatim}
+
+This means that estimates from the logistic regression model are for a
+change on the \textbf{log-odds} scale for \texttt{males} in comparison
+to the response baseline \texttt{females}. That is
+\[\mbox{ln} \bigg( \frac{p}{1-p} \bigg) = \alpha + \beta \cdot \mbox{age} = -2.7 + 0.06 \cdot \mbox{age}\]
+
+where \(p = \mbox{Prob(Male)}\) and \(1-p = \mbox{Prob(Female)}\).
+Hence, the \textbf{log-odds} of the instructor being male increase by
+0.06 for every one unit increase in \texttt{age}. This provies us with a
+point estimate of how the log-odds changes with age, however, we are
+also interested in producing a 95\% confidence interval for these
+log-odds. This can be done using the \texttt{confit} function in the
+\texttt{MASS} package:
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\KeywordTok{confint}\NormalTok{(model) }\OperatorTok{%>%}
+\StringTok{  }\KeywordTok{kable}\NormalTok{(}\DataTypeTok{booktabs =} \OtherTok{TRUE}\NormalTok{) }\OperatorTok{%>%}
+\StringTok{  }\KeywordTok{kable_styling}\NormalTok{(}\DataTypeTok{latex_options =} \StringTok{"hold_position"}\NormalTok{,}
+                \DataTypeTok{format =} \StringTok{"latex"}\NormalTok{)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\KeywordTok{confint}\NormalTok{(model)}
+\end{Highlighting}
+\end{Shaded}
+
+To understand how these endpoints are calculated, consider the following
+code:
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{mod.coef.logodds <-}\StringTok{ }\NormalTok{model }\OperatorTok{%>%}
+\StringTok{  }\KeywordTok{summary}\NormalTok{() }\OperatorTok{%>%}
+\StringTok{  }\KeywordTok{coef}\NormalTok{()}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{age.logodds.lower <-}\StringTok{ }\NormalTok{mod.coef.logodds[}\StringTok{"age"}\NormalTok{, }\StringTok{"Estimate"}\NormalTok{] }\OperatorTok{-}\StringTok{ }\FloatTok{1.96} \OperatorTok{*}\StringTok{ }\NormalTok{mod.coef.logodds[}\StringTok{"age"}\NormalTok{, }\StringTok{"Std. Error"}\NormalTok{]}
+\NormalTok{age.logodds.upper <-}\StringTok{ }\NormalTok{mod.coef.logodds[}\StringTok{"age"}\NormalTok{, }\StringTok{"Estimate"}\NormalTok{] }\OperatorTok{+}\StringTok{ }\FloatTok{1.96} \OperatorTok{*}\StringTok{ }\NormalTok{mod.coef.logodds[}\StringTok{"age"}\NormalTok{, }\StringTok{"Std. Error"}\NormalTok{]}
+\end{Highlighting}
+\end{Shaded}
+
+Hence the point estimate for the log-odds is 0.06, which has a
+corresponding 95\% confidence interval of (0.04, 0.08). This can be
+displayed graphically using the \texttt{plot\_model} function from the
+\texttt{sjPlot} package simply passing our \texttt{model} as an
+argument:
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\KeywordTok{plot_model}\NormalTok{(model, }\DataTypeTok{show.values =} \OtherTok{TRUE}\NormalTok{, }\DataTypeTok{transform =} \OtherTok{NULL}\NormalTok{, }\DataTypeTok{title =} \StringTok{"Log-Odds (Male instructor)"}\NormalTok{, }\DataTypeTok{show.p =} \OtherTok{FALSE}\NormalTok{)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{figure}
+
+{\centering \includegraphics[width=0.5\linewidth]{DAWeek9_files/figure-latex/plot2-1} 
+
+}
+
+\caption{\label{fig.plot2}The log-Odds of age for Male instructors}\label{fig:plot2}
+\end{figure}
+
+Some of the interesting arguments that can be passed to the
+\texttt{plot\_model} function are:
+
+\begin{itemize}
+\tightlist
+\item
+  \texttt{show.values} = TRUE/FALSE`: Whether the log-odds/odds values
+  should be displayed;
+\item
+  \texttt{show.p\ =\ TRUE/FALSE}: Adds asterisks that indicate the
+  significance level of estimates to the value labels;
+\item
+  \texttt{transform}: A character vector naming the function that will
+  be applied to the estimates. The default transformation uses exp to
+  display the odds ratios, while transform = NULL displays the log-odds;
+  and
+\item
+  \texttt{vline.color}: colour of the vertical ``zero effect'' line.
+\end{itemize}
+
+Further details on using \texttt{plot\_model} can be found
+\href{https://strengejacke.wordpress.com/2017/10/23/one-function-to-rule-them-all-visualization-of-regression-models-in-rstats-w-sjplot/}{here}
+and \href{https://strengejacke.github.io/sjPlot/index.html}{here}
+
+Now, let's add the estimates of the log-odds to our data set:
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{evals.gender <-}\StringTok{ }\NormalTok{evals.gender }\OperatorTok{%>%}
+\StringTok{  }\KeywordTok{mutate}\NormalTok{(}\DataTypeTok{logodds.male =} \KeywordTok{predict}\NormalTok{(model))}
+\end{Highlighting}
+\end{Shaded}
+
+\textbf{What is the log-odds of a 63 year old instructor being male?}
+
+\begin{itemize}
+\tightlist
+\item
+  The log-odds of a 62 year-old instructor being male is 1.21
+\end{itemize}
+
+\textbf{What is the log-odds of a 29 year old instructor being male?}
+
+\begin{itemize}
+\tightlist
+\item
+  The log-odds of a 29 year-old instructor being male is -0.87
+\end{itemize}
+
+\subsection{Odds}\label{odds}
+
+Typically we would like to work on the \textbf{odds} scale as it is
+easier to interpret an odds-ratio as opposed to the log-odds-ratio. To
+obatin the odds we simply exponentiate the log-odds, that is
+\[\frac{p}{1-p} = \mbox{exp}(\alpha + \beta \cdot \mbox{age})\]
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{model }\OperatorTok{%>%}
+\StringTok{  }\KeywordTok{coef}\NormalTok{() }\OperatorTok{%>%}
+\StringTok{  }\KeywordTok{exp}\NormalTok{()}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+(Intercept)         age 
+ 0.06734369  1.06498927 
+\end{verbatim}
+
+On the odds scale, the value of the intercept (0.07) gives the odds of a
+teaching instructor being male given their \texttt{age\ =\ 0}, which is
+obviously not a viable age for a teaching instructor, and hence why this
+value is very close to zero. For \texttt{age} we have an odds of 1.06,
+which indicates that for every 1 unit increase in age, the odds of the
+teaching instructor being male increase by a factor of 1.06. So how is
+this calculated? Let's look at the odds-ratio obtained from instructors
+aged 51 to 52 years old, that is, a 1 units difference:
+\[\frac{\mbox{Odds}_{\mbox{age=52}}}{\mbox{Odds}_{\mbox{age=51}}} = \Bigg( \frac{ \frac{p_{age=52}}{1-p_{age=52}} } { \frac{p_{age=51}}{1-p_{age=51}} } \Bigg) = \frac{\mbox{exp}(\alpha + \beta \cdot 52)}{\mbox{exp}(\alpha + \beta \cdot 51)} = {\mbox{exp}(\beta \cdot (52 - 51))}\]
+
+For example, the odds of a teaching instructor who is 45 years old being
+male is given by
+\[\frac{p}{1-p}= \mbox{exp}(\alpha + \beta \cdot \mbox{age}) = \mbox{exp}( 0.07 + 1.06 \cdot 45) = 48\]
+
+This can be interpreted as the chances of an instructor who is 45 being
+a male are 15\% greater than them being female. We can obtain a 95\%
+confidence interval for the odds by simply exponentiating the lower and
+upper bounds of our log-odds interval.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{age.odds.lower <-}\StringTok{ }\KeywordTok{exp}\NormalTok{(age.logodds.lower)}
+\NormalTok{age.odds.upper <-}\StringTok{ }\KeywordTok{exp}\NormalTok{(age.logodds.upper)}
+\end{Highlighting}
+\end{Shaded}
+
+Hence the point estimate for the odds is 0.07, which has a corresponding
+95\% confidence interval of (1.04, 1.09). This can be displayed
+graphically using the \texttt{plot\_model} function from the
+\texttt{sjPlot} package by simply passing our \texttt{model} as an
+argument as well as removing \texttt{transform\ =\ NULL} (the default
+transformation is exponential):
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\KeywordTok{plot_model}\NormalTok{(model, }\DataTypeTok{show.values =} \OtherTok{TRUE}\NormalTok{, }\DataTypeTok{axis.lim =} \KeywordTok{c}\NormalTok{(}\DecValTok{1}\NormalTok{,}\FloatTok{1.5}\NormalTok{), }
+           \DataTypeTok{title =} \StringTok{"Odds (Male instructor)"}\NormalTok{, }\DataTypeTok{show.p =} \OtherTok{FALSE}\NormalTok{)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{figure}
+
+{\centering \includegraphics[width=0.5\linewidth]{DAWeek9_files/figure-latex/plot3-1} 
+
+}
+
+\caption{\label{fig.plot3}The odds of age for Male instructors}\label{fig:plot3}
+\end{figure}
+
+\textbf{Note}: As the 95\% confidence interval is so narrow it is hard
+to see it displayed in the plot, but it is included by default. The
+\texttt{axis.lim\ =\ c(1,1.5)} argument improves its visibility as seen
+here.
+
+Now, let's add the estimates of the odds to our data set:
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{evals.gender <-}\StringTok{ }\NormalTok{evals.gender }\OperatorTok{%>%}
+\StringTok{  }\KeywordTok{mutate}\NormalTok{(}\DataTypeTok{odds.male =} \KeywordTok{exp}\NormalTok{(logodds.male))}
+\end{Highlighting}
+\end{Shaded}
+
+\textbf{What is the odds of a 47 year old instructor being male?}
+
+\begin{itemize}
+\tightlist
+\item
+  The log-odds of a 62 year-old instructor being male is 1.3
+\end{itemize}
+
+\textbf{What is the log-odds of a 56 year old instructor being male?}
+
+\begin{itemize}
+\tightlist
+\item
+  The odds of a 56 year-old instructor being male is 2.29
+\end{itemize}
+
+\subsection{Probabilities}\label{probabilities}
+
+We can obtain the probability \(p=\mbox{Prob(Male)}\) using the
+following transformation:
+\[p = \frac{\mbox{exp}(\alpha + \beta \cdot \mbox{age})}{1 + \mbox{exp}(\alpha + \beta \cdot \mbox{age})}\]
+
+For example, the probabilit of a teaching instructor who is 52 years old
+being male is
+
+\[p = \frac{\mbox{exp}(\alpha + \beta \cdot \mbox{age})}{1 + \mbox{exp}(\alpha + \beta \cdot \mbox{age})} = \frac{\mbox{exp}(-2.697946 + 0.0629647 \cdot \mbox{52})}{1 + \mbox{exp}(-2.697946 + 0.0629647 \cdot \mbox{52})}\]
+
+which can be computed in R as follows:
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{p.num <-}\StringTok{ }\KeywordTok{exp}\NormalTok{(mod.coef.logodds[}\StringTok{"(Intercept)"}\NormalTok{, }\StringTok{"Estimate"}\NormalTok{] }\OperatorTok{+}\StringTok{ }
+\StringTok{               }\NormalTok{mod.coef.logodds[}\StringTok{"age"}\NormalTok{, }\StringTok{"Estimate"}\NormalTok{] }\OperatorTok{*}\StringTok{ }\DecValTok{52}\NormalTok{)}
+\NormalTok{p.denom <-}\StringTok{ }\DecValTok{1} \OperatorTok{+}\StringTok{ }\NormalTok{p.num}
+\NormalTok{p.num}\OperatorTok{/}\NormalTok{p.denom}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+[1] 0.6401971
+\end{verbatim}
+
+The \texttt{plogis()} function from the \texttt{stats} library can also
+be used to obtain probabilities from the log-odds:
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\KeywordTok{plogis}\NormalTok{(mod.coef.logodds[}\StringTok{"(Intercept)"}\NormalTok{, }\StringTok{"Estimate"}\NormalTok{] }\OperatorTok{+}\StringTok{ }
+\StringTok{         }\NormalTok{mod.coef.logodds[}\StringTok{"age"}\NormalTok{, }\StringTok{"Estimate"}\NormalTok{] }\OperatorTok{*}\StringTok{ }\DecValTok{52}\NormalTok{)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+[1] 0.6401971
+\end{verbatim}
+
+Let's add the probabilities to our data, which is done using the
+\texttt{fitted()} function:
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{evals.gender <-}\StringTok{ }\NormalTok{evals.gender }\OperatorTok{%>%}
+\StringTok{  }\KeywordTok{mutate}\NormalTok{(}\DataTypeTok{probs.male =} \KeywordTok{fitted}\NormalTok{(model))}
+\end{Highlighting}
+\end{Shaded}
+
+**Note*: \texttt{predict(model,\ type\ =\ "response")} will also provide
+the estimated probabilities.
+
+\textbf{What is the probability of a 3 year old instructor being
+female?}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{q5 <-}\StringTok{ }\NormalTok{evals.gender }\OperatorTok{%>%}
+\StringTok{  }\KeywordTok{filter}\NormalTok{(age }\OperatorTok{==}\StringTok{ }\DecValTok{33}\NormalTok{, gender }\OperatorTok{==}\StringTok{ "female"}\NormalTok{)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{itemize}
+\tightlist
+\item
+  The log-odds of a 33 year-old instructor being female is 0.65
+\end{itemize}
+
+\textbf{What is the log-odds of a 47 year old instructor being male?}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{q6 <-}\StringTok{ }\NormalTok{evals.gender }\OperatorTok{%>%}
+\StringTok{  }\KeywordTok{filter}\NormalTok{(age }\OperatorTok{==}\StringTok{ }\DecValTok{47}\NormalTok{, gender }\OperatorTok{==}\StringTok{ "male"}\NormalTok{)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{itemize}
+\tightlist
+\item
+  The odds of a 47 year-old instructor being male is 0.56
+\end{itemize}
+
+Finally, we can plot the probability of being male using the
+\texttt{geom\_smooth()} function by giving \texttt{method\ =\ "glm"} and
+\texttt{methods.args\ =\ list(family\ =\ "binomial")} as follows:
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{evals.gender <-}\StringTok{ }\NormalTok{evals.gender }\OperatorTok{%>%}
+\StringTok{                  }\KeywordTok{mutate}\NormalTok{(}\DataTypeTok{probs.male =} \KeywordTok{fitted}\NormalTok{(model))}
+
+\KeywordTok{ggplot}\NormalTok{(}\DataTypeTok{data =}\NormalTok{ evals.gender, }\KeywordTok{aes}\NormalTok{(}\DataTypeTok{x =}\NormalTok{ age, }\DataTypeTok{y =}\NormalTok{ probs.male)) }\OperatorTok{+}
+\StringTok{  }\KeywordTok{geom_dotplot}\NormalTok{(}\DataTypeTok{dotsize =} \FloatTok{0.6}\NormalTok{, }\DataTypeTok{alpha =} \FloatTok{0.2}\NormalTok{, }\KeywordTok{aes}\NormalTok{(}\DataTypeTok{fill =}\NormalTok{ gender), }
+               \DataTypeTok{binwidth =} \DecValTok{1}\NormalTok{, }\DataTypeTok{stackgroups =} \OtherTok{TRUE}\NormalTok{) }\OperatorTok{+}
+\StringTok{  }\KeywordTok{geom_smooth}\NormalTok{(}\DataTypeTok{method =} \StringTok{"glm"}\NormalTok{,}
+              \DataTypeTok{method.args =} \KeywordTok{list}\NormalTok{(}\DataTypeTok{family =} \StringTok{"binomial"}\NormalTok{),}
+              \DataTypeTok{se =} \OtherTok{FALSE}\NormalTok{) }\OperatorTok{+}
+\StringTok{  }\KeywordTok{labs}\NormalTok{(}\DataTypeTok{x =} \StringTok{"Age"}\NormalTok{, }\DataTypeTok{y =} \StringTok{"Probability of instructor being male"}\NormalTok{)}
+\end{Highlighting}
+\end{Shaded}
+
+\textbf{Note}: the ages of all teaching instructors have been
+superimposed as a dotplot using \texttt{geom\_dotplot()}.
+
+The \texttt{plot\_model()} function from the \texttt{sjPlot} package can
+also produce the estimated probabilities by \texttt{age} as follows:
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\KeywordTok{plot_model}\NormalTok{(model, }\DataTypeTok{type =} \StringTok{"pred"}\NormalTok{, }\DataTypeTok{title =} \StringTok{""}\NormalTok{, }
+           \DataTypeTok{axis.title =} \KeywordTok{c}\NormalTok{(}\StringTok{"Age"}\NormalTok{, }\StringTok{"Prob. of instructor being male"}\NormalTok{))}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+$age
+\end{verbatim}
+
+\begin{figure}
+
+{\centering \includegraphics[width=0.5\linewidth]{DAWeek9_files/figure-latex/plot5-1} 
+
+}
+
+\caption{\label{fig.plot5}Probability of teaching instructor being male by age}\label{fig:plot5}
+\end{figure}
 
 
 \end{document}

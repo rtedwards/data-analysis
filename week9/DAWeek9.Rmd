@@ -3,13 +3,13 @@ title: "Generalized Linear Models"
 author: "Robert Edwards"
 date: "8 March 2019"
 output:
+  html_document:
+    df_print: paged
   pdf_document:
     fig_caption: yes
     keep_tex: yes
     latex_engine: pdflatex
     number_sections: yes
-  html_document:
-    df_print: paged
 header-includes: 
   \usepackage{float} 
   \floatplacement{figure}{H}
@@ -23,6 +23,7 @@ knitr::opts_chunk$set(echo = FALSE, eval = TRUE, warning = FALSE, message = FALS
 library(ggplot2)
 library(dplyr)
 library(moderndive)
+library(knitr)
 library(kableExtra)
 library(gridExtra)
 library(sjPlot)
