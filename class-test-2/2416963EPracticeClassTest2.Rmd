@@ -23,6 +23,7 @@ library(broom)
 library(sjPlot)
 library(stats)
 library(readr)
+library(kableExtra)
 ```
 
 ## Question 1
@@ -115,15 +116,15 @@ The bootstrap samples are created by subtracting y from x.  The 95% confidence i
 (a) Using the data contained in `practice2.csv` build a regression model that adequately describes the `response` in terms of the potential explantory variables `X1`, `X2`, `X3` and `X4`. Your chosen model will therefore be the one that you believe best represents the `response`. Use only the theoretical confidence intervals generated under standard assumptions (which you should check) to identify the correct model.  Note you **do not** need to consider interaction terms.
 
 ```{r, message=FALSE, echo=FALSE}
-q2data <- read_csv("practice2.csv")
-q2data$X2 <- as.factor(q2data$X2)
+data2 <- read_csv("practice2.csv")
+data2$X2 <- as.factor(data2$X2)
 ```
 
 First, a pairs plot, Figure \ref{fig:pairs1}, is made to explore the data visually and see if there are any patterns or correlations in the data. The data consists of 
 
-```{r pairs2, echo = FALSE, eval = TRUE, fig.width=7, fig.height=3,  fig.pos="H", fig.align = "center", warning = FALSE, fig.cap = "\\label{fig:pairs1}Pairs plot for question 2."}
+```{r pairs2, echo = FALSE, eval = FALSE, fig.width=7, fig.height=3,  fig.pos="H", fig.align = "center", warning = FALSE, fig.cap = "\\label{fig:pairs1}Pairs plot for question 2."}
 ggpairs(
-  q2data,
+  data2,
   mapping = ggplot2::aes(color = X2),
   upper = list(continuous = wrap("density", alpha = 0.5), combo = "box"),
   lower = list(continuous = wrap("points", alpha = 0.4), combo = wrap("dot", alpha = 0.4)),
@@ -131,7 +132,39 @@ ggpairs(
   )
 ```
 
+```{r, message=FALSE, echo=FALSE}
+model1 <- lm(response ~ X1 + X2 + X3 + X4, data = data2)
 
+get_regression_table(model1) %>%
+  kable(digits = 3, caption = '\\label{tab:fullmodel} Parameter estimates obtained from the model response ~ X1 + X2 + X3 + X4', booktabs = TRUE, format = "latex") %>%
+  kable_styling(font_size = 10, latex_options = "hold_position")
+
+reg.tab1<- get_regression_table(model1)
+reg1<- as.data.frame(reg.tab1)
+```
 
 (b)  Construct a table of **all** the possible linear models (without interactions or transformations) that could be fitted to the `response` variable in `practice2.csv`.  In the table include the $R^2_{adj}$ and $AIC$ values for model comparisons. Do these measures lead you to the same conclusion about the model that best represents the data as in part (a)?  Note: you are **not** required to check assumptions for each of these models in this task.
 
+```{r modelselection, echo = FALSE, eval = TRUE, warning = FALSE, message = FALSE}
+
+model.comp.full <- glance(lm(response ~ X1 + X2 + X3 + X4, data = data2))
+model.comp.123 <- glance(lm(response ~ X1 + X2 + X3, data = data2))
+model.comp.12 <- glance(lm(response ~ X1 + X2, data = data2))
+model.comp.13 <- glance(lm(response ~ X1 + X3, data = data2))
+model.comp.14 <- glance(lm(response ~ X1 + X4, data = data2))
+model.comp.23 <- glance(lm(response ~ X2 + X3, data = data2))
+model.comp.24 <- glance(lm(response ~ X2 + X4, data = data2))
+model.comp.34 <- glance(lm(response ~ X3 + X4, data = data2))
+model.comp.4 <- glance(lm(response ~ X4, data = data2))
+model.comp.3 <- glance(lm(response ~ X3, data = data2))
+model.comp.2 <- glance(lm(response ~ X2, data = data2))
+model.comp.1 <- glance(lm(response ~ X1))
+
+Models <- c('Full Model', 'Model 123', 'Model 234', 'Model 134', 'Model 234', 'Model 12', 'Model 13', 'Model 14', 'Model 23', 'Model 24', 'Model 34', 'Model 1', 'Model 2', 'Model 3', 'Model 4')
+
+bind_rows(model.comp.values.full, model.comp.values.m1, model.comp.values.m2, model.comp.values.m3, model.comp.values.m4, .id = "Model") %>%
+  select(Model, adj.r.squared, AIC, BIC) %>%
+  mutate(Model = Models) %>%
+   kable(caption = '\\label{tab:select} Model selection', booktabs = TRUE, format = "latex") %>%
+  kable_styling(font_size = 10, latex_options = 'HOLD_position')
+```

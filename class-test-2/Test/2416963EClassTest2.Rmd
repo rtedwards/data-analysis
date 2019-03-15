@@ -1,0 +1,265 @@
+---
+title: "Class Test 2 TEMPLATE"
+author: "2416963E"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, eval = TRUE, error = TRUE, out.width = '70%', fig.align = "center", fig.pos = 'H')
+library(ggplot2)
+library(GGally)
+library(gridExtra)
+library(dplyr)
+library(moderndive)
+library(ISLR)
+library(skimr)
+library(plotly)
+library(tidyr)
+library(datasets)
+library(knitr)
+library(janitor)
+library(infer)
+library(broom)
+library(sjPlot)
+library(stats)
+library(readr)
+library(kableExtra)
+```
+
+## Question 1
+
+A farmer is interested in comparing the effect of different fertilizers on crop yield, and decides to undertake an experiment. He wants to compare three different fertilizers, labelled `A`, `B` and `C`, respectively, against a control group with no fertilizer, labelled `D` . He partitions his field of potatoes into 40 plots, and applies each of the four treatments A, B, C and D to 10 plots at random. At the end of the experiment he measures the total weight (in kilograms) of potatoes grown in each of the 40 plots. Use bootstrap confidence intervals to compare the effects of the fertilizers on the yield of potatoes harvested. 
+
+The results of this experiment are stored in `test1.csv`.
+
+\begin{flushright}10 MARKS\end{flushright}
+
+```{r, warning=FALSE, message=FALSE}
+q1data <- read_csv("test1.csv")
+
+# Put the data in tidy format
+data1 <- gather(data = q1data,
+                key = treatment,   ## select column to collapse
+                value = weight, ## column name for values
+                1:4)
+```
+
+```{r echo = TRUE, eval = TRUE, warning = FALSE, message = FALSE}
+set.seed(123)
+# Take 1000 bootstrap samples for each treatment
+samples_A <- data1 %>% 
+  filter(treatment == "A") %>%
+  specify(formula = weight ~ NULL) %>%
+  generate(reps = 1000, type = "bootstrap") %>%
+  calculate(stat = "mean")
+
+samples_B <- data1 %>% 
+  filter(treatment == "B") %>%
+  specify(formula = weight ~ NULL) %>%
+  generate(reps = 1000, type = "bootstrap") %>%
+  calculate(stat = "mean")
+
+samples_C <- data1 %>% 
+  filter(treatment == "C") %>%
+  specify(formula = weight ~ NULL) %>%
+  generate(reps = 1000, type = "bootstrap") %>%
+  calculate(stat = "mean")
+
+samples_D <- data1 %>% 
+  filter(treatment == "D") %>%
+  specify(formula = weight ~ NULL) %>%
+  generate(reps = 1000, type = "bootstrap") %>%
+  calculate(stat = "mean") 
+
+A_bar <- samples_A %>%
+  summarize(mean_of_means = mean(stat))
+B_bar <- samples_B %>%
+  summarize(mean_of_means = mean(stat))
+C_bar <- samples_C %>%
+  summarize(mean_of_means = mean(stat))
+D_bar <- samples_D %>%
+  summarize(mean_of_means = mean(stat))
+
+# Visualize the distribution of the bootstrap samples
+pA <- samples_A %>%
+  visualize(obs_stat = A_bar)
+pB <- samples_B %>%
+  visualize(obs_stat = B_bar)
+pC <- samples_C %>%
+  visualize(obs_stat = C_bar)
+pD <- samples_D %>%
+  visualize(obs_stat = D_bar)
+
+# Caluclate bootstrap confidence intervals
+# Plots of boot strap samples are roughly Normal (symmetric and bell-shaped) so we use "percentile method"
+ci_A <- samples_A %>%
+  get_ci(level = 0.95, type = "percentile")
+ci_B <- samples_B %>%
+  get_ci(level = 0.95, type = "percentile")
+ci_C <- samples_C %>%
+  get_ci(level = 0.95, type = "percentile")
+ci_D <- samples_D %>%
+  get_ci(level = 0.95, type = "percentile")
+
+```
+
+To compare the effect of three fertilizers (Plot A, Plot B, Plot C) to the control (Plot D), we use bootstrap samples to estimate the distribution of each treatment and create 95% confidence intervals.  We are interested in seeing if there is an effect on the weight of potatoes grown using the three different fertilizers.  The sample mean of Plot D is `r round(A_bar, 2)` is used a a point comparison.  The condfidence intervals for Plots A is (`r round(ci_A[1], 2)`, `r round(ci_A[2], 2)`), which contains the point estimate for the control (Plot D).  We therefore conclude there is no evidence of a difference in the weight of potatoes grown using fertilizer A.  The confidence interval for Plot B is (`r round(ci_B[1], 2)`, `r round(ci_B[2], 2)`), which does not contain the point estimate for the control (`r round(A_bar, 2)`) so we conclude there is evidence that fertilizer B has an effect on the weight of potatos. The confidence interval for Plot C is (`r round(ci_C[1], 2)`, `r round(ci_C[2], 2)`), which does not contain the point estimate for the control (`r round(A_bar, 2)`) so we conclude there is evidence that fertilizer C has an effect on the weight of potatos. 
+
+
+
+
+\newpage
+## Question 2
+
+A social scientist is interested in exploring what people consider the "ideal height" of a life partner.  She sampled 100 male and 100 female adults and asked what they considered the ideal height (in centimetres) for a partner to be.  The social scientist also recorded if the subject was a man or a woman and their height (in centimetres), as she was interested to see if there were differences between men and women and if ideal partner height can be predicted given an individual's height.
+
+The data set is stored in the file `test2.csv`.
+
+```{r, warning=FALSE, message=FALSE}
+data2 <- read_csv("test2.csv")
+```
+
+(a) Generate numerical and graphical summaries that are appropriate for this data and the research questions.  Comment briefly on the summaries with respect to the research questions.
+\begin{flushright}5 MARKS\end{flushright}
+
+```{r summary1, echo = FALSE, eval = TRUE, warning = FALSE, message = FALSE}
+data2 %>%
+  group_by(Gender) %>%
+  summarise(n=n(), Mean=round(mean(Height), digits=1), St.Dev=round(sd(Height), digits=1), Min=min(Height), Q1=quantile(Height, 0.25), Median=median(Height), Q3=quantile(Height, 0.75), Max=max(Height)) %>%
+  kable(caption = "\\label{tab:summaries} Summary statistics on ideal height of a partner by gender of 100 adults.") %>%
+  kable_styling(latex_options = "hold_position")
+```
+
+```{r summary2, echo = FALSE, eval = TRUE, warning = FALSE, message = FALSE}
+skim_with(numeric = list(hist = NULL, missing = NULL, complete = NULL, n = NULL))
+data2 %>%
+  skim_to_list() %>%
+  .$numeric %>%
+  kable(col.names = c("Variable", "Mean", "SD", "Minimum", "1st quartile", "Median", "3rd quartile",
+                      "Maximum"),
+        caption = '\\label{tab:summary}Summary statistics on height of an individual and ideal height of a partner of 100 adults.',
+        booktabs = TRUE, format = "latex") %>%
+  kable_styling(font_size = 10, latex_options = "hold_position")
+```
+
+```{r pairs, echo = FALSE, eval = FALSE, fig.width=7, fig.height=3,  fig.pos="H", fig.align = "center", warning = FALSE, fig.cap = "\\label{fig:pairs1}Pairs plot for question 2."}
+# If you get an error then reinstall the following package
+# install.packages("GGally")
+install.packages("GGally")
+ggpairs(
+  data2,
+  mapping = ggplot2::aes(color = Gender),
+  upper = list(continuous = wrap("density", alpha = 0.5), combo = "box"),
+  lower = list(continuous = wrap("points", alpha = 0.4), combo = wrap("dot", alpha = 0.4)),
+  diag = list(continuous = wrap("densityDiag"))
+  )
+```
+
+```{r pairs2, echo = TRUE, eval = TRUE, fig.width=7, fig.height=3,  fig.pos="H", fig.align = "center", warning = FALSE, fig.cap = "\\label{fig:pairs1}Pairs plot for question 2."}
+#This is here in case ggpairs doesn't work
+
+ggplot(data2[-3], aes(x = Height, y = Ideal.Height)) +
+  geom_point() +
+  labs(x = "Height", y = "Ideal Height")
+
+ggplot(data2, aes(x = Gender, y = Ideal.Height)) +
+  geom_boxplot() + 
+  labs(x = "Gender", y = "Ideal Height")
+```
+
+There doesn't appear to be any obvious patterns between `Ideal.Height` and `Height` though the correlation is `r round(cor(data2$Ideal.Height, data2$Height),2)`, indicating a weak negative correlation between the height of an individual and their partner's ideal height, which seems counterintuitive.  The boxplot of Gender against Ideal.Height indicates that women prefer taller partners than men as shown by the non-overlapping IQRs.  
+
+
+(b)  Starting with the model with the most parameters, use a model selection method of your choosing to find the model which is most appropriate for this data (you do **not** need to check the model assumptions in this class test).  Write down the equation(s) for your chosen fitted model and produce a plot which shows how your chosen model relates to the original data. Use your chosen fitted model to answer the research questions in clear, non-technical English.
+\begin{flushright}6 MARKS\end{flushright}
+
+We begin by first fitting the full model with interaction terms.
+
+```{r model1, echo = TRUE, eval = TRUE, warning = FALSE, message = FALSE}
+model1 <- lm(Ideal.Height ~ Height*Gender, data = data2)
+
+coeff.model1 <- model1 %>%
+  coef() %>%
+  as.numeric()
+
+get_regression_table(model1) %>%
+  kable(digits = 3, caption = '\\label{tab:model1}Parameter estimates obtained from the model Ideal Height ~ Height * Gender', booktabs = TRUE, format = "latex") %>%
+  kable_styling(font_size = 10, latex_options = "hold_position")
+
+reg.tab1 <- get_regression_table(model1)
+reg1 <- as.data.frame(reg.tab1)
+```
+
+From Table \ref{fig:model1} below, the terms `GenderWoman` and `Height:GenderWoman` have a confidence interval containing zero (`r round(reg1$lower_ci[3],2)`, `r round(reg1$upper_ci[3],2)`) and (`r round(reg1$lower_ci[4],2)`, `r round(reg1$upper_ci[4],2)`), respectively.  The term `Height:GenderWoman` is a higher order interaction term so it dropped from the model.
+
+
+```{r model2, echo = FALSE, eval = TRUE, warning = FALSE, message = FALSE}
+model2 <- lm(Ideal.Height ~ Height + Gender, data = data2)
+
+coeff.model2 <- model2 %>%
+  coef() %>%
+  as.numeric()
+
+get_regression_table(model2) %>%
+  kable(digits = 3, caption = '\\label{tab:model2}Parameter estimates obtained from the model Ideal Height ~ Height + Gender', booktabs = TRUE, format = "latex") %>%
+  kable_styling(font_size = 10, latex_options = "hold_position")
+
+reg.tab2 <- get_regression_table(model2)
+reg2 <- as.data.frame(reg.tab2)
+```
+
+Without the interaction term between Height and Gender, `Height:GenderWoman`, all confidence interval doe not contain zero and this model is chosen as the best-fitting model for this data.
+
+The equation for the best fitting model is:
+$$\mbox{Ideal.Height}_i = \alpha + \beta_{\mbox{Height}} \cdot \mbox{Height}_{i} + \beta_{\mbox{Gender}} \cdot \mathbb{I}_{\mbox{Gender}}(i) +\epsilon_i$$
+
+where
+
+- $\epsilon_i$ is the error not captured in the model.
+- $\alpha$ is the intercept of the regression line;
+- $\beta_{\mbox{Height}}$ is the slope of the regression line for both Females and Males;
+- $\mbox{Height}_{i}$ is the Height of the $i^{th}$ observation
+- $\beta_{\mbox{Gender}}$ is the additional term added to $\alpha$ to get the intercept of the regression line for Gender; and
+- $\mathbb{I}_{\mbox{Gender}}(i)$ is an indicator function such that
+
+$$\mathbb{I}_{\mbox{Gender}}(i)=\left\{
+\begin{array}{ll}
+1 ~~~ \mbox{if the} ~ i \mbox{th observation Woman}, \\
+0 ~~~ \mbox{Otherwise}.\\
+\end{array}
+\right.$$
+
+```{r plot.model1, fig.width=13, fig.pos = "H", fig.align = "center", fig.cap = "\\label{fig:plot.model1}Scatterplot of ideal partner height by height and gender"}
+ggplot(data2, aes(x = Height, y = Ideal.Height, color = Gender)) +
+  geom_point() +
+  labs(x = "Height", y = "Ideal Height", color = "Gender") +
+  geom_smooth(method = "lm", se = FALSE)
+```
+
+For every 1 centimeter increase in the height of a women, her ideal height of a partner increases by`r round(reg2$estimate[2],2)` centimeters. On average, women prefer partners `r round(reg2$estimate[3],2)` centimeters taller than their own height.  
+
+
+
+(c)  Suppose someone else analysed this data but ignored the effect of gender.  What model would they choose to best describe the data?  Produce a graph showing their preferred model and compare its interpretation with your preferred model in part (b).  What name is given to this apparent contradiction?
+\begin{flushright}4 MARKS\end{flushright}
+
+If someone were to model this data without taking gender into account they might use the following model:
+$$\mbox{Ideal.Height}_i = \alpha + \beta_{\mbox{Height}} \cdot \mbox{Height}_{i} + \epsilon_i$$
+
+where
+
+- $\alpha$ is the intercept of the regression line;
+- $\beta_{\mbox{Height}}$ is the slope of the regression line for both Females and Males;
+- $\mbox{Height}_{i}$ is the Height of the $i^{th}$ observation, and
+- $\epsilon_i$ is the error not captured in the model.
+
+```{r plot2b, fig.width=13, fig.pos = "H", fig.align = "center", fig.cap = "\\label{fig:plot2b}Scatterplot of ideal partner height by height."}
+ggplot(data2, aes(x = Height, y = Ideal.Height)) +
+  geom_point() +
+  labs(x = "Height", y = "Ideal Height") +
+  geom_smooth(method = "lm", se = FALSE)
+```
+
+This model shows the ideal height of a partner decreases with the height of the individual.  When gender is taken into account, the ideal height of a partner increases.  This is an example of Simpson's Paradox.   
+
+
